@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tecnytte - Servicio Unificado</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .status-bar {
+            background: #f8f9fa;
+            padding: 20px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .status-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            border-left: 4px solid #28a745;
+        }
+
+        .status-card.error {
+            border-left-color: #dc3545;
+        }
+
+        .status-card h3 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+
+        .status-card p {
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+
+        .controls {
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .controls button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+            transition: background 0.3s;
+        }
+
+        .controls button:hover {
+            background: #0056b3;
+        }
+
+        .controls button.danger {
+            background: #dc3545;
+        }
+
+        .controls button.danger:hover {
+            background: #c82333;
+        }
+
+        .logs-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .log-section {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .log-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .log-header h3 {
+            margin: 0;
+            font-size: 1.2em;
+        }
+
+        .log-count {
+            background: rgba(255,255,255,0.2);
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.9em;
+        }
+
+        .log-content {
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        .log-entry {
+            background: #f8f9fa;
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 3px solid #007bff;
+        }
+
+        .log-entry.error {
+            border-left-color: #dc3545;
+            background: #fff5f5;
+        }
+
+        .log-timestamp {
+            font-size: 0.8em;
+            color: #6c757d;
+            margin-bottom: 5px;
+        }
+
+        .log-message {
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        .log-data {
+            font-size: 0.85em;
+            color: #495057;
+            background: #e9ecef;
+            padding: 5px;
+            border-radius: 3px;
+            white-space: pre-wrap;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+        }
+
+        .refresh-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }
+
+        .refresh-btn:hover {
+            background: #218838;
+        }
+
+        @media (max-width: 768px) {
+            .logs-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .status-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Tecnytte - Servicio Unificado</h1>
+            <p>Panel de control y monitoreo de logs</p>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-grid" id="statusGrid">
+                <div class="status-card">
+                    <h3>🔄 Autoruta PastTime</h3>
+                    <p>Estado: <span id="autoruta-status">Cargando...</span></p>
+                    <p>Última ejecución: <span id="autoruta-last">-</span></p>
+                </div>
+                <div class="status-card">
+                    <h3>⚡ Autoruta RealTime</h3>
+                    <p>Estado: <span id="realtime-status">Cargando...</span></p>
+                    <p>Última ejecución: <span id="realtime-last">-</span></p>
+                </div>
+                <div class="status-card">
+                    <h3>🔄 Réplica</h3>
+                    <p>Estado: <span id="replica-status">Cargando...</span></p>
+                    <p>Última ejecución: <span id="replica-last">-</span></p>
+                </div>
+                <div class="status-card">
+                    <h3>💬 Cobranza</h3>
+                    <p>Estado: <span id="cobranza-status">Cargando...</span></p>
+                    <p>Última ejecución: <span id="cobranza-last">-</span></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button onclick="refreshAll()">🔄 Actualizar Todo</button>
+            <button onclick="clearAllLogs()" class="danger">🗑️ Limpiar Todos los Logs</button>
+            <button onclick="clearLogs('COBRANZA')" class="danger">🗑️ Limpiar Cobranza</button>
+            <button onclick="clearLogs('AUTORUTA_PASTTIME')" class="danger">🗑️ Limpiar Autoruta PastTime</button>
+            <button onclick="clearLogs('AUTORUTA_REALTIME')" class="danger">🗑️ Limpiar Autoruta RealTime</button>
+            <button onclick="clearLogs('REPLICA')" class="danger">🗑️ Limpiar Réplica</button>
+            <button onclick="clearLogs('SYSTEM')" class="danger">🗑️ Limpiar Sistema</button>
+        </div>
+
+        <div class="logs-container">
+            <div class="log-section">
+                <div class="log-header">
+                    <h3>💬 Cobranza</h3>
+                    <div class="log-count" id="cobranza-count">0</div>
+                    <button class="refresh-btn" onclick="refreshLogs('COBRANZA')">🔄</button>
+                </div>
+                <div class="log-content" id="cobranza-logs">
+                    <div class="loading">Cargando logs...</div>
+                </div>
+            </div>
+
+            <div class="log-section">
+                <div class="log-header">
+                    <h3>🔄 Autoruta PastTime</h3>
+                    <div class="log-count" id="autoruta-pasttime-count">0</div>
+                    <button class="refresh-btn" onclick="refreshLogs('AUTORUTA_PASTTIME')">🔄</button>
+                </div>
+                <div class="log-content" id="autoruta-pasttime-logs">
+                    <div class="loading">Cargando logs...</div>
+                </div>
+            </div>
+
+            <div class="log-section">
+                <div class="log-header">
+                    <h3>⚡ Autoruta RealTime</h3>
+                    <div class="log-count" id="autoruta-realtime-count">0</div>
+                    <button class="refresh-btn" onclick="refreshLogs('AUTORUTA_REALTIME')">🔄</button>
+                </div>
+                <div class="log-content" id="autoruta-realtime-logs">
+                    <div class="loading">Cargando logs...</div>
+                </div>
+            </div>
+
+            <div class="log-section">
+                <div class="log-header">
+                    <h3>🔄 Réplica</h3>
+                    <div class="log-count" id="replica-count">0</div>
+                    <button class="refresh-btn" onclick="refreshLogs('REPLICA')">🔄</button>
+                </div>
+                <div class="log-content" id="replica-logs">
+                    <div class="loading">Cargando logs...</div>
+                </div>
+            </div>
+
+            <div class="log-section">
+                <div class="log-header">
+                    <h3>⚙️ Sistema</h3>
+                    <div class="log-count" id="system-count">0</div>
+                    <button class="refresh-btn" onclick="refreshLogs('SYSTEM')">🔄</button>
+                </div>
+                <div class="log-content" id="system-logs">
+                    <div class="loading">Cargando logs...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        let refreshInterval;
+
+        // Función para formatear fecha
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString('es-ES');
+        }
+
+        // Función para renderizar logs
+        function renderLogs(category, logs) {
+            const container = document.getElementById(`${category.toLowerCase().replace('_', '-')}-logs`);
+            const countElement = document.getElementById(`${category.toLowerCase().replace('_', '-')}-count`);
+            
+            countElement.textContent = logs.length;
+            
+            if (logs.length === 0) {
+                container.innerHTML = '<div class="loading">No hay logs disponibles</div>';
+                return;
+            }
+
+            container.innerHTML = logs.map(log => `
+                <div class="log-entry ${log.message.toLowerCase().includes('error') ? 'error' : ''}">
+                    <div class="log-timestamp">${formatDate(log.timestamp)}</div>
+                    <div class="log-message">${log.message}</div>
+                    ${log.data && Object.keys(log.data).length > 0 ? 
+                        `<div class="log-data">${JSON.stringify(log.data, null, 2)}</div>` : 
+                        ''
+                    }
+                </div>
+            `).join('');
+        }
+
+        // Función para cargar logs de una categoría
+        async function loadLogs(category) {
+            try {
+                const response = await fetch(`${API_BASE}/logs?category=${category}`);
+                const logs = await response.json();
+                renderLogs(category, logs);
+            } catch (error) {
+                console.error(`Error cargando logs de ${category}:`, error);
+                document.getElementById(`${category.toLowerCase().replace('_', '-')}-logs`).innerHTML = 
+                    '<div class="loading">Error al cargar logs</div>';
+            }
+        }
+
+        // Función para cargar estado del sistema
+        async function loadStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/status`);
+                const status = await response.json();
+                
+                // Actualizar contadores
+                document.getElementById('cobranza-count').textContent = status.logs.COBRANZA;
+                document.getElementById('autoruta-pasttime-count').textContent = status.logs.AUTORUTA_PASTTIME;
+                document.getElementById('autoruta-realtime-count').textContent = status.logs.AUTORUTA_REALTIME;
+                document.getElementById('replica-count').textContent = status.logs.REPLICA;
+                document.getElementById('system-count').textContent = status.logs.SYSTEM;
+                
+                // Actualizar estados
+                document.getElementById('autoruta-status').textContent = 'Activo';
+                document.getElementById('realtime-status').textContent = 'Activo';
+                document.getElementById('replica-status').textContent = 'Activo';
+                document.getElementById('cobranza-status').textContent = 'Programado';
+                
+                // Actualizar últimas ejecuciones
+                document.getElementById('autoruta-last').textContent = formatDate(status.services.autoruta.lastRun);
+                document.getElementById('realtime-last').textContent = formatDate(status.services.autoruta.lastRun);
+                document.getElementById('replica-last').textContent = formatDate(status.services.replica.lastRun);
+                document.getElementById('cobranza-last').textContent = formatDate(status.timestamp);
+                
+            } catch (error) {
+                console.error('Error cargando estado:', error);
+            }
+        }
+
+        // Función para refrescar logs de una categoría específica
+        function refreshLogs(category) {
+            loadLogs(category);
+        }
+
+        // Función para refrescar todo
+        function refreshAll() {
+            loadStatus();
+            loadLogs('COBRANZA');
+            loadLogs('AUTORUTA_PASTTIME');
+            loadLogs('AUTORUTA_REALTIME');
+            loadLogs('REPLICA');
+            loadLogs('SYSTEM');
+        }
+
+        // Función para limpiar logs
+        async function clearLogs(category = null) {
+            try {
+                const url = category ? `${API_BASE}/logs?category=${category}` : `${API_BASE}/logs`;
+                const response = await fetch(url, { method: 'DELETE' });
+                
+                if (response.ok) {
+                    if (category) {
+                        loadLogs(category);
+                    } else {
+                        refreshAll();
+                    }
+                    alert('Logs limpiados exitosamente');
+                } else {
+                    alert('Error al limpiar logs');
+                }
+            } catch (error) {
+                console.error('Error limpiando logs:', error);
+                alert('Error al limpiar logs');
+            }
+        }
+
+        // Función para limpiar todos los logs
+        function clearAllLogs() {
+            if (confirm('¿Estás seguro de que quieres limpiar todos los logs?')) {
+                clearLogs();
+            }
+        }
+
+        // Inicializar
+        function init() {
+            refreshAll();
+            
+            // Configurar actualización automática cada 10 segundos
+            refreshInterval = setInterval(() => {
+                loadStatus();
+            }, 10000);
+        }
+
+        // Inicializar cuando la página esté lista
+        document.addEventListener('DOMContentLoaded', init);
+
+        // Limpiar intervalo cuando se cierre la página
+        window.addEventListener('beforeunload', () => {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+        });
+    </script>
+</body>
+</html> 
