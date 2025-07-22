@@ -402,6 +402,18 @@ async function getDeudaClientes() {
     }
 }
 
+// Función para obtener clientes programados
+async function getClientesProgramados() {
+    try {
+        const results = await getDataFromDB("SELECT * FROM bot_clientes WHERE tipo_cliente = 'PROGRAMADO'");
+        logger.addLog('COBRANZA', `Clientes programados obtenidos: ${results.length}`);
+        return results;
+    } catch (error) {
+        logger.addLog('COBRANZA', 'Error al obtener clientes programados', { error: error.message });
+        throw error;
+    }
+}
+
 // Función para enviar mensaje WhatsApp
 async function enviarMensaje(cliente, index) {
     const empresaConfig = API_CONFIG[cliente.empresa.trim()];
@@ -690,6 +702,95 @@ async function processCobranza() {
     }
 }
 
+// Función para procesar clientes programados
+async function processClientesProgramados() {
+    try {
+        const clientes = await getClientesProgramados();
+        logger.addLog('COBRANZA', `Validando ${clientes.length} clientes programados`);
+
+        for (const cliente of clientes) {
+            try {
+                // Validar que tenga fecha_hora_envio
+                if (!cliente.fecha_hora_envio) {
+                    logger.addLog('COBRANZA', `Cliente programado sin fecha de envío: ${cliente.id}`, {
+                        cliente: cliente.nombre,
+                        numero: cliente.numero
+                    });
+                    continue;
+                }
+
+                const fechaProgramada = new Date(cliente.fecha_hora_envio);
+                const fechaActual = new Date();
+                
+                // Verificar si es la hora y minuto programado
+                const esHoraProgramada = fechaActual.getFullYear() === fechaProgramada.getFullYear() &&
+                                       fechaActual.getMonth() === fechaProgramada.getMonth() &&
+                                       fechaActual.getDate() === fechaProgramada.getDate() &&
+                                       fechaActual.getHours() === fechaProgramada.getHours() &&
+                                       fechaActual.getMinutes() === fechaProgramada.getMinutes();
+
+                if (esHoraProgramada) {
+                    logger.addLog('COBRANZA', `Enviando mensaje programado: ${cliente.id}`, {
+                        cliente: cliente.nombre,
+                        numero: cliente.numero,
+                        fechaProgramada: fechaProgramada.toLocaleString(),
+                        repetirCadaDias: cliente.repetir_cada_dias
+                    });
+
+                    // Enviar mensaje
+                    await enviarMensaje(cliente, 'PROGRAMADO');
+
+                    // Actualizar fecha_hora_envio para la próxima repetición
+                    if (cliente.repetir_cada_dias > 0) {
+                        const nuevaFecha = new Date(fechaProgramada);
+                        nuevaFecha.setDate(nuevaFecha.getDate() + parseInt(cliente.repetir_cada_dias));
+                        
+                        // Actualizar en la base de datos
+                        await actualizarFechaEnvio(cliente.id, nuevaFecha);
+                        
+                        logger.addLog('COBRANZA', `Fecha actualizada para próxima repetición: ${cliente.id}`, {
+                            cliente: cliente.nombre,
+                            nuevaFecha: nuevaFecha.toLocaleString(),
+                            diasRepeticion: cliente.repetir_cada_dias
+                        });
+                    } else {
+                        logger.addLog('COBRANZA', `Mensaje único enviado, no se repite: ${cliente.id}`, {
+                            cliente: cliente.nombre
+                        });
+                    }
+                }
+            } catch (error) {
+                logger.addLog('COBRANZA', `Error procesando cliente programado: ${cliente.id}`, {
+                    cliente: cliente.nombre,
+                    error: error.message
+                });
+                continue;
+            }
+        }
+    } catch (error) {
+        logger.addLog('COBRANZA', 'Error en proceso de clientes programados', { error: error.message });
+    }
+}
+
+// Función para actualizar fecha_hora_envio en la base de datos
+async function actualizarFechaEnvio(clienteId, nuevaFecha) {
+    try {
+        const fechaFormateada = nuevaFecha.toISOString().slice(0, 19).replace('T', ' ');
+        await getDataFromDB(
+            "UPDATE bot_clientes SET fecha_hora_envio = ? WHERE id = ?",
+            [fechaFormateada, clienteId]
+        );
+        logger.addLog('COBRANZA', `Fecha actualizada en BD: ${clienteId}`, {
+            nuevaFecha: fechaFormateada
+        });
+    } catch (error) {
+        logger.addLog('COBRANZA', `Error actualizando fecha en BD: ${clienteId}`, {
+            error: error.message
+        });
+        throw error;
+    }
+}
+
 // Rutas de la API web
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -746,6 +847,9 @@ cron.schedule(process.env.COBRANZA_SCHEDULE, () => {
     logger.addLog('COBRANZA', 'Iniciando tarea programada de verificación de deuda');
     processCobranza();
 });
+
+// Programar verificación de clientes programados (cada minuto)
+setInterval(processClientesProgramados, 60000); // 60000 ms = 1 minuto
 
 // Iniciar servidor
 app.listen(PORT, () => {
