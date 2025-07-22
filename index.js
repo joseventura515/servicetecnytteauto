@@ -839,6 +839,85 @@ app.delete('/api/logs', (req, res) => {
     res.json({ message: 'Logs limpiados exitosamente' });
 });
 
+// Ruta para obtener configuración actual
+app.get('/api/config', (req, res) => {
+    const config = {
+        DB_HOST: process.env.DB_HOST,
+        DB_USER: process.env.DB_USER,
+        DB_PASSWORD: process.env.DB_PASSWORD,
+        DB_NAME: process.env.DB_NAME,
+        PORT: process.env.PORT,
+        NODE_ENV: process.env.NODE_ENV,
+        TECNYTTE_TRACKER_URL: process.env.TECNYTTE_TRACKER_URL,
+        API_KEY: process.env.API_KEY,
+        USER_TOKEN: process.env.USER_TOKEN,
+        TECNYTTESOLUCIONES_TOKEN: process.env.TECNYTTESOLUCIONES_TOKEN,
+        TECNYTTESOLUCIONES_INSTANCE: process.env.TECNYTTESOLUCIONES_INSTANCE,
+        TECNYTTEGPS_TOKEN: process.env.TECNYTTEGPS_TOKEN,
+        TECNYTTEGPS_INSTANCE: process.env.TECNYTTEGPS_INSTANCE,
+        TECNYTTESIMULACIONES_TOKEN: process.env.TECNYTTESIMULACIONES_TOKEN,
+        TECNYTTESIMULACIONES_INSTANCE: process.env.TECNYTTESIMULACIONES_INSTANCE,
+        AUTORUTA_INTERVAL: process.env.AUTORUTA_INTERVAL,
+        REPLICA_INTERVAL: process.env.REPLICA_INTERVAL,
+        COBRANZA_SCHEDULE: process.env.COBRANZA_SCHEDULE,
+        MESSAGE_DELAY: process.env.MESSAGE_DELAY
+    };
+    res.json(config);
+});
+
+// Ruta para actualizar configuración
+app.post('/api/config', (req, res) => {
+    try {
+        const fs = require('fs');
+        const newConfig = req.body;
+        
+        // Leer configuración actual
+        let configContent = fs.readFileSync('./config.env', 'utf8');
+        
+        // Actualizar cada variable
+        Object.keys(newConfig).forEach(key => {
+            const regex = new RegExp(`^${key}=.*`, 'm');
+            const newLine = `${key}=${newConfig[key]}`;
+            
+            if (regex.test(configContent)) {
+                configContent = configContent.replace(regex, newLine);
+            } else {
+                // Si no existe, agregar al final
+                configContent += `\n${newLine}`;
+            }
+        });
+        
+        // Escribir archivo actualizado
+        fs.writeFileSync('./config.env', configContent);
+        
+        // Recargar variables de entorno
+        require('dotenv').config({ path: './config.env', override: true });
+        
+        // Actualizar configuración de APIs
+        API_CONFIG.TECNYTTESOLUCIONES.token = process.env.TECNYTTESOLUCIONES_TOKEN;
+        API_CONFIG.TECNYTTESOLUCIONES.instance_id = process.env.TECNYTTESOLUCIONES_INSTANCE;
+        API_CONFIG.TECNYTTEGPS.token = process.env.TECNYTTEGPS_TOKEN;
+        API_CONFIG.TECNYTTEGPS.instance_id = process.env.TECNYTTEGPS_INSTANCE;
+        API_CONFIG.TECNYTTESIMULACIONES.token = process.env.TECNYTTESIMULACIONES_TOKEN;
+        API_CONFIG.TECNYTTESIMULACIONES.instance_id = process.env.TECNYTTESIMULACIONES_INSTANCE;
+        
+        logger.addLog('SYSTEM', 'Configuración actualizada desde web interface', {
+            updatedKeys: Object.keys(newConfig)
+        });
+        
+        res.json({ 
+            message: 'Configuración actualizada exitosamente',
+            updatedKeys: Object.keys(newConfig)
+        });
+    } catch (error) {
+        logger.addLog('SYSTEM', 'Error actualizando configuración', { error: error.message });
+        res.status(500).json({ 
+            error: 'Error actualizando configuración',
+            details: error.message 
+        });
+    }
+});
+
 // Iniciar servicios
 setInterval(processAutoRuta, parseInt(process.env.AUTORUTA_INTERVAL));
 setInterval(processReplica, parseInt(process.env.REPLICA_INTERVAL));

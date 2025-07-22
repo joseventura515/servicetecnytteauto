@@ -203,12 +203,112 @@
             background: #218838;
         }
 
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            color: #2c3e50;
+        }
+
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        .config-section {
+            margin-bottom: 20px;
+        }
+
+        .config-section h3 {
+            color: #495057;
+            margin-bottom: 10px;
+            padding: 5px 0;
+            border-bottom: 2px solid #007bff;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .config-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .config-item label {
+            font-weight: 500;
+            margin-bottom: 5px;
+            color: #495057;
+        }
+
+        .config-item input, .config-item textarea {
+            padding: 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .config-item textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        .config-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+        }
+
         @media (max-width: 768px) {
             .logs-container {
                 grid-template-columns: 1fr;
             }
             
             .status-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .config-grid {
                 grid-template-columns: 1fr;
             }
         }
@@ -262,6 +362,7 @@
             <button onclick="clearLogs('AUTORUTA_REALTIME')" class="danger">🗑️ Limpiar Autoruta RealTime</button>
             <button onclick="clearLogs('REPLICA')" class="danger">🗑️ Limpiar Réplica</button>
             <button onclick="clearLogs('SYSTEM')" class="danger">🗑️ Limpiar Sistema</button>
+            <button onclick="showConfigModal()" style="background: #17a2b8;">⚙️ Configuración</button>
             <button onclick="logout()" style="background: #6c757d;">🚪 Cerrar Sesión</button>
         </div>
 
@@ -320,6 +421,134 @@
                     <div class="loading">Cargando logs...</div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal de Configuración -->
+    <div id="configModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚙️ Configuración del Sistema</h2>
+                <span class="close" onclick="closeConfigModal()">&times;</span>
+            </div>
+            
+            <form id="configForm">
+                <!-- Base de Datos -->
+                <div class="config-section">
+                    <h3>🗄️ Base de Datos</h3>
+                    <div class="config-grid">
+                        <div class="config-item">
+                            <label for="DB_HOST">Host:</label>
+                            <input type="text" id="DB_HOST" name="DB_HOST" required>
+                        </div>
+                        <div class="config-item">
+                            <label for="DB_USER">Usuario:</label>
+                            <input type="text" id="DB_USER" name="DB_USER" required>
+                        </div>
+                        <div class="config-item">
+                            <label for="DB_PASSWORD">Contraseña:</label>
+                            <input type="password" id="DB_PASSWORD" name="DB_PASSWORD" required>
+                        </div>
+                        <div class="config-item">
+                            <label for="DB_NAME">Base de Datos:</label>
+                            <input type="text" id="DB_NAME" name="DB_NAME" required>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Servidor -->
+                <div class="config-section">
+                    <h3>🌐 Servidor</h3>
+                    <div class="config-grid">
+                        <div class="config-item">
+                            <label for="PORT">Puerto:</label>
+                            <input type="number" id="PORT" name="PORT" required>
+                        </div>
+                        <div class="config-item">
+                            <label for="NODE_ENV">Entorno:</label>
+                            <input type="text" id="NODE_ENV" name="NODE_ENV" required>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- APIs -->
+                <div class="config-section">
+                    <h3>🔗 APIs</h3>
+                    <div class="config-grid">
+                        <div class="config-item">
+                            <label for="TECNYTTE_TRACKER_URL">URL Tracker:</label>
+                            <input type="url" id="TECNYTTE_TRACKER_URL" name="TECNYTTE_TRACKER_URL" required>
+                        </div>
+                        <div class="config-item">
+                            <label for="API_KEY">API Key:</label>
+                            <input type="text" id="API_KEY" name="API_KEY" required>
+                        </div>
+                        <div class="config-item">
+                            <label for="USER_TOKEN">User Token:</label>
+                            <input type="text" id="USER_TOKEN" name="USER_TOKEN" required>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- WhatsApp APIs -->
+                <div class="config-section">
+                    <h3>💬 WhatsApp APIs</h3>
+                    <div class="config-grid">
+                        <div class="config-item">
+                            <label for="TECNYTTESOLUCIONES_TOKEN">Token Tecnytte Soluciones:</label>
+                            <textarea id="TECNYTTESOLUCIONES_TOKEN" name="TECNYTTESOLUCIONES_TOKEN" required></textarea>
+                        </div>
+                        <div class="config-item">
+                            <label for="TECNYTTESOLUCIONES_INSTANCE">Instance Tecnytte Soluciones:</label>
+                            <textarea id="TECNYTTESOLUCIONES_INSTANCE" name="TECNYTTESOLUCIONES_INSTANCE" required></textarea>
+                        </div>
+                        <div class="config-item">
+                            <label for="TECNYTTEGPS_TOKEN">Token Tecnytte GPS:</label>
+                            <textarea id="TECNYTTEGPS_TOKEN" name="TECNYTTEGPS_TOKEN" required></textarea>
+                        </div>
+                        <div class="config-item">
+                            <label for="TECNYTTEGPS_INSTANCE">Instance Tecnytte GPS:</label>
+                            <textarea id="TECNYTTEGPS_INSTANCE" name="TECNYTTEGPS_INSTANCE" required></textarea>
+                        </div>
+                        <div class="config-item">
+                            <label for="TECNYTTESIMULACIONES_TOKEN">Token Tecnytte Simulaciones:</label>
+                            <textarea id="TECNYTTESIMULACIONES_TOKEN" name="TECNYTTESIMULACIONES_TOKEN" required></textarea>
+                        </div>
+                        <div class="config-item">
+                            <label for="TECNYTTESIMULACIONES_INSTANCE">Instance Tecnytte Simulaciones:</label>
+                            <textarea id="TECNYTTESIMULACIONES_INSTANCE" name="TECNYTTESIMULACIONES_INSTANCE" required></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Intervalos -->
+                <div class="config-section">
+                    <h3>⏰ Intervalos</h3>
+                    <div class="config-grid">
+                        <div class="config-item">
+                            <label for="AUTORUTA_INTERVAL">Intervalo Autoruta (ms):</label>
+                            <input type="number" id="AUTORUTA_INTERVAL" name="AUTORUTA_INTERVAL" required>
+                        </div>
+                        <div class="config-item">
+                            <label for="REPLICA_INTERVAL">Intervalo Réplica (ms):</label>
+                            <input type="number" id="REPLICA_INTERVAL" name="REPLICA_INTERVAL" required>
+                        </div>
+                        <div class="config-item">
+                            <label for="COBRANZA_SCHEDULE">Horario Cobranza (cron):</label>
+                            <input type="text" id="COBRANZA_SCHEDULE" name="COBRANZA_SCHEDULE" required>
+                        </div>
+                        <div class="config-item">
+                            <label for="MESSAGE_DELAY">Delay Mensajes (ms):</label>
+                            <input type="number" id="MESSAGE_DELAY" name="MESSAGE_DELAY" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="config-actions">
+                    <button type="button" onclick="closeConfigModal()" style="background: #6c757d;">❌ Cancelar</button>
+                    <button type="submit" style="background: #28a745;">💾 Guardar Cambios</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -390,6 +619,81 @@
             sessionStorage.removeItem(AUTH_CONFIG.sessionKey);
             alert('Sesión cerrada');
             showLoginModal();
+        }
+
+        // Funciones para el modal de configuración
+        function showConfigModal() {
+            document.getElementById('configModal').style.display = 'block';
+            loadCurrentConfig();
+        }
+
+        function closeConfigModal() {
+            document.getElementById('configModal').style.display = 'none';
+        }
+
+        // Cargar configuración actual
+        async function loadCurrentConfig() {
+            try {
+                const response = await fetch(`${API_BASE}/config`);
+                const config = await response.json();
+                
+                // Llenar formulario con valores actuales
+                Object.keys(config).forEach(key => {
+                    const element = document.getElementById(key);
+                    if (element) {
+                        element.value = config[key] || '';
+                    }
+                });
+            } catch (error) {
+                console.error('Error cargando configuración:', error);
+                alert('Error al cargar la configuración actual');
+            }
+        }
+
+        // Manejar envío del formulario de configuración
+        document.getElementById('configForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            if (!confirm('¿Estás seguro de que quieres actualizar la configuración? Esto puede afectar el funcionamiento del sistema.')) {
+                return;
+            }
+            
+            const formData = new FormData(this);
+            const configData = {};
+            
+            for (let [key, value] of formData.entries()) {
+                configData[key] = value;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/config`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(configData)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert(`Configuración actualizada exitosamente.\nVariables actualizadas: ${result.updatedKeys.join(', ')}`);
+                    closeConfigModal();
+                } else {
+                    alert(`Error al actualizar configuración: ${result.error}`);
+                }
+            } catch (error) {
+                console.error('Error actualizando configuración:', error);
+                alert('Error al actualizar la configuración');
+            }
+        });
+
+        // Cerrar modal al hacer clic fuera de él
+        window.onclick = function(event) {
+            const modal = document.getElementById('configModal');
+            if (event.target === modal) {
+                closeConfigModal();
+            }
         }
 
         // Función para formatear fecha
