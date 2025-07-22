@@ -5,10 +5,22 @@ const cron = require('node-cron');
 const cors = require('cors');
 const { Worker } = require('worker_threads');
 const path = require('path');
+const session = require('express-session');
 require('dotenv').config({ path: './config.env' });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Configuración de sesiones
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'tecnytte-secret-key-2024',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { 
+        secure: false, // Cambiar a true en producción con HTTPS
+        maxAge: 24 * 60 * 60 * 1000 // 24 horas
+    }
+}));
 
 // Middleware
 app.use(cors());
@@ -792,18 +804,56 @@ async function actualizarFechaEnvio(clienteId, nuevaFecha) {
     }
 }
 
-// Rutas de la API web
-app.get('/', (req, res) => {
+// Middleware de autenticación
+function requireAuth(req, res, next) {
+    if (req.session.authenticated) {
+        next();
+    } else {
+        res.redirect('/login');
+    }
+}
+
+// Rutas de autenticación
+app.get('/login', (req, res) => {
+    if (req.session.authenticated) {
+        res.redirect('/');
+    } else {
+        res.sendFile(path.join(__dirname, 'public', 'login.html'));
+    }
+});
+
+app.post('/login', (req, res) => {
+    const { username, password } = req.body;
+    
+    // Credenciales simples (en producción usar hash y base de datos)
+    const validUsername = process.env.ADMIN_USERNAME || 'admin';
+    const validPassword = process.env.ADMIN_PASSWORD || 'tecnytte123';
+    
+    if (username === validUsername && password === validPassword) {
+        req.session.authenticated = true;
+        res.json({ success: true });
+    } else {
+        res.status(401).json({ success: false, message: 'Credenciales inválidas' });
+    }
+});
+
+app.post('/logout', (req, res) => {
+    req.session.destroy();
+    res.json({ success: true });
+});
+
+// Rutas protegidas
+app.get('/', requireAuth, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.get('/api/logs', (req, res) => {
+app.get('/api/logs', requireAuth, (req, res) => {
     const category = req.query.category;
     const logs = logger.getLogs(category);
     res.json(logs);
 });
 
-app.get('/api/status', (req, res) => {
+app.get('/api/status', requireAuth, (req, res) => {
     const status = {
         timestamp: new Date().toISOString(),
         services: {
@@ -833,7 +883,7 @@ app.get('/api/status', (req, res) => {
     res.json(status);
 });
 
-app.delete('/api/logs', (req, res) => {
+app.delete('/api/logs', requireAuth, (req, res) => {
     const category = req.query.category;
     logger.clearLogs(category);
     res.json({ message: 'Logs limpiados exitosamente' });

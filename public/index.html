@@ -252,13 +252,18 @@
         </div>
 
         <div class="controls">
-            <button onclick="refreshAll()">🔄 Actualizar Todo</button>
-            <button onclick="clearAllLogs()" class="danger">🗑️ Limpiar Todos los Logs</button>
-            <button onclick="clearLogs('COBRANZA')" class="danger">🗑️ Limpiar Cobranza</button>
-            <button onclick="clearLogs('AUTORUTA_PASTTIME')" class="danger">🗑️ Limpiar Autoruta PastTime</button>
-            <button onclick="clearLogs('AUTORUTA_REALTIME')" class="danger">🗑️ Limpiar Autoruta RealTime</button>
-            <button onclick="clearLogs('REPLICA')" class="danger">🗑️ Limpiar Réplica</button>
-            <button onclick="clearLogs('SYSTEM')" class="danger">🗑️ Limpiar Sistema</button>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <button onclick="refreshAll()">🔄 Actualizar Todo</button>
+                    <button onclick="clearAllLogs()" class="danger">🗑️ Limpiar Todos los Logs</button>
+                    <button onclick="clearLogs('COBRANZA')" class="danger">🗑️ Limpiar Cobranza</button>
+                    <button onclick="clearLogs('AUTORUTA_PASTTIME')" class="danger">🗑️ Limpiar Autoruta PastTime</button>
+                    <button onclick="clearLogs('AUTORUTA_REALTIME')" class="danger">🗑️ Limpiar Autoruta RealTime</button>
+                    <button onclick="clearLogs('REPLICA')" class="danger">🗑️ Limpiar Réplica</button>
+                    <button onclick="clearLogs('SYSTEM')" class="danger">🗑️ Limpiar Sistema</button>
+                </div>
+                <button onclick="logout()" style="background: #6c757d; margin-left: 20px;">🚪 Cerrar Sesión</button>
+            </div>
         </div>
 
         <div class="logs-container">
@@ -437,6 +442,20 @@
         function clearAllLogs() {
             if (confirm('¿Estás seguro de que quieres limpiar todos los logs?')) {
                 clearLogs();
+            }
+        }
+
+        // Función para cerrar sesión
+        async function logout() {
+            try {
+                const response = await fetch('/logout', { method: 'POST' });
+                if (response.ok) {
+                    window.location.href = '/login';
+                }
+            } catch (error) {
+                console.error('Error al cerrar sesión:', error);
+                // Redirigir de todas formas
+                window.location.href = '/login';
             }
         }
 
