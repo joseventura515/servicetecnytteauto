@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tecnytte - Servicio Unificado</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚀</text></svg>">
     <style>
         * {
             margin: 0;
@@ -17,124 +16,6 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
-        }
-
-        /* Estilos del Login */
-        .login-container {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            padding: 40px;
-            width: 100%;
-            max-width: 400px;
-            text-align: center;
-            margin: 0 auto;
-            margin-top: 10vh;
-        }
-
-        .logo {
-            margin-bottom: 30px;
-        }
-
-        .logo h1 {
-            font-size: 2.5em;
-            color: #2c3e50;
-            margin-bottom: 10px;
-        }
-
-        .logo p {
-            color: #6c757d;
-            font-size: 1.1em;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-            text-align: left;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: #2c3e50;
-            font-weight: 500;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #e9ecef;
-            border-radius: 8px;
-            font-size: 16px;
-            transition: border-color 0.3s;
-        }
-
-        .form-group input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        .login-btn {
-            width: 100%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 15px;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s;
-        }
-
-        .login-btn:hover {
-            transform: translateY(-2px);
-        }
-
-        .login-btn:disabled {
-            opacity: 0.7;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .error-message {
-            background: #fff5f5;
-            color: #dc3545;
-            padding: 10px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            border: 1px solid #feb2b2;
-            display: none;
-        }
-
-        .loading {
-            display: none;
-            margin-left: 10px;
-        }
-
-        .spinner {
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid #667eea;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .footer {
-            margin-top: 30px;
-            color: #6c757d;
-            font-size: 0.9em;
-        }
-
-        /* Estilos del Panel Principal */
-        .main-container {
-            display: none;
         }
 
         .container {
@@ -334,147 +215,109 @@
     </style>
 </head>
 <body>
-    <!-- Pantalla de Login -->
-    <div id="loginScreen" class="login-container">
-        <div class="logo">
-            <h1>🚀 Tecnytte</h1>
-            <p>Panel de Administración</p>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Tecnytte - Servicio Unificado</h1>
+            <p>Panel de control y monitoreo de logs</p>
+            <div style="margin-top: 10px; font-size: 0.9em; opacity: 0.8;">
+                <span id="auth-status">🔒 Autenticado como: admin</span>
+            </div>
         </div>
 
-        <div class="error-message" id="errorMessage"></div>
-
-        <form id="loginForm">
-            <div class="form-group">
-                <label for="username">Usuario</label>
-                <input type="text" id="username" name="username" required autocomplete="username">
+        <div class="status-bar">
+            <div class="status-grid" id="statusGrid">
+                <div class="status-card">
+                    <h3>🔄 Autoruta PastTime</h3>
+                    <p>Estado: <span id="autoruta-status">Cargando...</span></p>
+                    <p>Última ejecución: <span id="autoruta-last">-</span></p>
+                </div>
+                <div class="status-card">
+                    <h3>⚡ Autoruta RealTime</h3>
+                    <p>Estado: <span id="realtime-status">Cargando...</span></p>
+                    <p>Última ejecución: <span id="realtime-last">-</span></p>
+                </div>
+                <div class="status-card">
+                    <h3>🔄 Réplica</h3>
+                    <p>Estado: <span id="replica-status">Cargando...</span></p>
+                    <p>Última ejecución: <span id="replica-last">-</span></p>
+                </div>
+                <div class="status-card">
+                    <h3>💬 Cobranza</h3>
+                    <p>Estado: <span id="cobranza-status">Cargando...</span></p>
+                    <p>Última ejecución: <span id="cobranza-last">-</span></p>
+                </div>
+                <div class="status-card">
+                    <h3>📅 Programados</h3>
+                    <p>Estado: <span id="programados-status">Activo</span></p>
+                    <p>Verificación: <span id="programados-last">Cada minuto</span></p>
+                </div>
             </div>
-
-            <div class="form-group">
-                <label for="password">Contraseña</label>
-                <input type="password" id="password" name="password" required autocomplete="current-password">
-            </div>
-
-            <button type="submit" class="login-btn" id="loginBtn">
-                Iniciar Sesión
-                <span class="loading" id="loading">
-                    <div class="spinner"></div>
-                </span>
-            </button>
-        </form>
-
-        <div class="footer">
-            <p>Servicio Unificado Tecnytte</p>
-            <p>© 2024 Tecnytte. Todos los derechos reservados.</p>
         </div>
-    </div>
 
-    <!-- Panel Principal -->
-    <div id="mainScreen" class="main-container">
-        <div class="container">
-            <div class="header">
-                <h1>🚀 Tecnytte - Servicio Unificado</h1>
-                <p>Panel de control y monitoreo de logs</p>
-            </div>
+        <div class="controls">
+            <button onclick="refreshAll()">🔄 Actualizar Todo</button>
+            <button onclick="clearAllLogs()" class="danger">🗑️ Limpiar Todos los Logs</button>
+            <button onclick="clearLogs('COBRANZA')" class="danger">🗑️ Limpiar Cobranza</button>
+            <button onclick="clearLogs('AUTORUTA_PASTTIME')" class="danger">🗑️ Limpiar Autoruta PastTime</button>
+            <button onclick="clearLogs('AUTORUTA_REALTIME')" class="danger">🗑️ Limpiar Autoruta RealTime</button>
+            <button onclick="clearLogs('REPLICA')" class="danger">🗑️ Limpiar Réplica</button>
+            <button onclick="clearLogs('SYSTEM')" class="danger">🗑️ Limpiar Sistema</button>
+            <button onclick="logout()" style="background: #6c757d;">🚪 Cerrar Sesión</button>
+        </div>
 
-            <div class="status-bar">
-                <div class="status-grid" id="statusGrid">
-                    <div class="status-card">
-                        <h3>🔄 Autoruta PastTime</h3>
-                        <p>Estado: <span id="autoruta-status">Cargando...</span></p>
-                        <p>Última ejecución: <span id="autoruta-last">-</span></p>
-                    </div>
-                    <div class="status-card">
-                        <h3>⚡ Autoruta RealTime</h3>
-                        <p>Estado: <span id="realtime-status">Cargando...</span></p>
-                        <p>Última ejecución: <span id="realtime-last">-</span></p>
-                    </div>
-                    <div class="status-card">
-                        <h3>🔄 Réplica</h3>
-                        <p>Estado: <span id="replica-status">Cargando...</span></p>
-                        <p>Última ejecución: <span id="replica-last">-</span></p>
-                    </div>
-                    <div class="status-card">
-                        <h3>💬 Cobranza</h3>
-                        <p>Estado: <span id="cobranza-status">Cargando...</span></p>
-                        <p>Última ejecución: <span id="cobranza-last">-</span></p>
-                    </div>
-                    <div class="status-card">
-                        <h3>📅 Programados</h3>
-                        <p>Estado: <span id="programados-status">Activo</span></p>
-                        <p>Verificación: <span id="programados-last">Cada minuto</span></p>
-                    </div>
+        <div class="logs-container">
+            <div class="log-section">
+                <div class="log-header">
+                    <h3>💬 Cobranza</h3>
+                    <div class="log-count" id="cobranza-count">0</div>
+                    <button class="refresh-btn" onclick="refreshLogs('COBRANZA')">🔄</button>
+                </div>
+                <div class="log-content" id="cobranza-logs">
+                    <div class="loading">Cargando logs...</div>
                 </div>
             </div>
 
-            <div class="controls">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <button onclick="refreshAll()">🔄 Actualizar Todo</button>
-                        <button onclick="clearAllLogs()" class="danger">🗑️ Limpiar Todos los Logs</button>
-                        <button onclick="clearLogs('COBRANZA')" class="danger">🗑️ Limpiar Cobranza</button>
-                        <button onclick="clearLogs('AUTORUTA_PASTTIME')" class="danger">🗑️ Limpiar Autoruta PastTime</button>
-                        <button onclick="clearLogs('AUTORUTA_REALTIME')" class="danger">🗑️ Limpiar Autoruta RealTime</button>
-                        <button onclick="clearLogs('REPLICA')" class="danger">🗑️ Limpiar Réplica</button>
-                        <button onclick="clearLogs('SYSTEM')" class="danger">🗑️ Limpiar Sistema</button>
-                    </div>
-                    <button onclick="logout()" style="background: #6c757d; margin-left: 20px;">🚪 Cerrar Sesión</button>
+            <div class="log-section">
+                <div class="log-header">
+                    <h3>🔄 Autoruta PastTime</h3>
+                    <div class="log-count" id="autoruta-pasttime-count">0</div>
+                    <button class="refresh-btn" onclick="refreshLogs('AUTORUTA_PASTTIME')">🔄</button>
+                </div>
+                <div class="log-content" id="autoruta-pasttime-logs">
+                    <div class="loading">Cargando logs...</div>
                 </div>
             </div>
 
-            <div class="logs-container">
-                <div class="log-section">
-                    <div class="log-header">
-                        <h3>💬 Cobranza</h3>
-                        <div class="log-count" id="cobranza-count">0</div>
-                        <button class="refresh-btn" onclick="refreshLogs('COBRANZA')">🔄</button>
-                    </div>
-                    <div class="log-content" id="cobranza-logs">
-                        <div class="loading">Cargando logs...</div>
-                    </div>
+            <div class="log-section">
+                <div class="log-header">
+                    <h3>⚡ Autoruta RealTime</h3>
+                    <div class="log-count" id="autoruta-realtime-count">0</div>
+                    <button class="refresh-btn" onclick="refreshLogs('AUTORUTA_REALTIME')">🔄</button>
                 </div>
-
-                <div class="log-section">
-                    <div class="log-header">
-                        <h3>🔄 Autoruta PastTime</h3>
-                        <div class="log-count" id="autoruta-pasttime-count">0</div>
-                        <button class="refresh-btn" onclick="refreshLogs('AUTORUTA_PASTTIME')">🔄</button>
-                    </div>
-                    <div class="log-content" id="autoruta-pasttime-logs">
-                        <div class="loading">Cargando logs...</div>
-                    </div>
+                <div class="log-content" id="autoruta-realtime-logs">
+                    <div class="loading">Cargando logs...</div>
                 </div>
+            </div>
 
-                <div class="log-section">
-                    <div class="log-header">
-                        <h3>⚡ Autoruta RealTime</h3>
-                        <div class="log-count" id="autoruta-realtime-count">0</div>
-                        <button class="refresh-btn" onclick="refreshLogs('AUTORUTA_REALTIME')">🔄</button>
-                    </div>
-                    <div class="log-content" id="autoruta-realtime-logs">
-                        <div class="loading">Cargando logs...</div>
-                    </div>
+            <div class="log-section">
+                <div class="log-header">
+                    <h3>🔄 Réplica</h3>
+                    <div class="log-count" id="replica-count">0</div>
+                    <button class="refresh-btn" onclick="refreshLogs('REPLICA')">🔄</button>
                 </div>
-
-                <div class="log-section">
-                    <div class="log-header">
-                        <h3>🔄 Réplica</h3>
-                        <div class="log-count" id="replica-count">0</div>
-                        <button class="refresh-btn" onclick="refreshLogs('REPLICA')">🔄</button>
-                    </div>
-                    <div class="log-content" id="replica-logs">
-                        <div class="loading">Cargando logs...</div>
-                    </div>
+                <div class="log-content" id="replica-logs">
+                    <div class="loading">Cargando logs...</div>
                 </div>
+            </div>
 
-                <div class="log-section">
-                    <div class="log-header">
-                        <h3>⚙️ Sistema</h3>
-                        <div class="log-count" id="system-count">0</div>
-                        <button class="refresh-btn" onclick="refreshLogs('SYSTEM')">🔄</button>
-                    </div>
-                    <div class="log-content" id="system-logs">
-                        <div class="loading">Cargando logs...</div>
-                    </div>
+            <div class="log-section">
+                <div class="log-header">
+                    <h3>⚙️ Sistema</h3>
+                    <div class="log-count" id="system-count">0</div>
+                    <button class="refresh-btn" onclick="refreshLogs('SYSTEM')">🔄</button>
+                </div>
+                <div class="log-content" id="system-logs">
+                    <div class="loading">Cargando logs...</div>
                 </div>
             </div>
         </div>
@@ -483,105 +326,70 @@
     <script>
         const API_BASE = '/api';
         let refreshInterval;
-        let isAuthenticated = false;
-
-        // Funciones de Login
-        function showError(message) {
-            document.getElementById('errorMessage').textContent = message;
-            document.getElementById('errorMessage').style.display = 'block';
+        
+        // Configuración de autenticación
+        const AUTH_CONFIG = {
+            username: 'admin',
+            password: 'tecnytte2024',
+            sessionKey: 'tecnytte_auth'
+        };
+        
+        // Verificar autenticación al cargar
+        function checkAuth() {
+            const isAuthenticated = sessionStorage.getItem(AUTH_CONFIG.sessionKey);
+            if (!isAuthenticated) {
+                showLoginModal();
+            }
         }
-
-        function hideError() {
-            document.getElementById('errorMessage').style.display = 'none';
-        }
-
-        function setLoading(loading) {
-            const loginBtn = document.getElementById('loginBtn');
-            const loadingElement = document.getElementById('loading');
-            
-            if (!loginBtn || !loadingElement) {
-                console.error('Elementos de login no encontrados');
+        
+        // Mostrar modal de login
+        function showLoginModal() {
+            const username = prompt('Usuario:');
+            if (username === null) {
+                showLoginModal(); // Si cancela, mostrar de nuevo
                 return;
             }
             
-            if (loading) {
-                loginBtn.disabled = true;
-                loginBtn.textContent = 'Iniciando Sesión...';
-                loadingElement.style.display = 'inline-block';
+            const password = prompt('Contraseña:');
+            if (password === null) {
+                showLoginModal(); // Si cancela, mostrar de nuevo
+                return;
+            }
+            
+            if (username === AUTH_CONFIG.username && password === AUTH_CONFIG.password) {
+                sessionStorage.setItem(AUTH_CONFIG.sessionKey, 'true');
+                showWelcomeMessage();
             } else {
-                loginBtn.disabled = false;
-                loginBtn.textContent = 'Iniciar Sesión';
-                loadingElement.style.display = 'none';
+                alert('Usuario o contraseña incorrectos');
+                showLoginModal(); // Mostrar de nuevo si falla
             }
         }
-
-        function showMainScreen() {
-            document.getElementById('loginScreen').style.display = 'none';
-            document.getElementById('mainScreen').style.display = 'block';
-            isAuthenticated = true;
-            init();
-        }
-
-        function showLoginScreen() {
-            document.getElementById('loginScreen').style.display = 'block';
-            document.getElementById('mainScreen').style.display = 'none';
-            isAuthenticated = false;
-            if (refreshInterval) {
-                clearInterval(refreshInterval);
-            }
-        }
-
-        // Manejo del formulario de login
-        const loginForm = document.getElementById('loginForm');
-        if (loginForm) {
-            loginForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                
-                const username = document.getElementById('username')?.value;
-                const password = document.getElementById('password')?.value;
-
-                if (!username || !password) {
-                    showError('Por favor, completa todos los campos');
-                    return;
-                }
-
-                hideError();
-                setLoading(true);
-
-                try {
-                    const response = await fetch('/login', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ username, password })
-                    });
-
-                    const data = await response.json();
-
-                    if (data.success) {
-                        showMainScreen();
-                    } else {
-                        showError(data.message || 'Credenciales inválidas');
-                    }
-                } catch (error) {
-                    showError('Error de conexión. Intenta nuevamente.');
-                    console.error('Error de login:', error);
-                } finally {
-                    setLoading(false);
-                }
-            });
-        }
-
-        // Limpiar error cuando el usuario empiece a escribir
-        const usernameInput = document.getElementById('username');
-        const passwordInput = document.getElementById('password');
         
-        if (usernameInput) {
-            usernameInput.addEventListener('input', hideError);
+        // Mostrar mensaje de bienvenida
+        function showWelcomeMessage() {
+            alert('¡Bienvenido al Panel de Administración de Tecnytte!');
+            updateAuthStatus();
         }
-        if (passwordInput) {
-            passwordInput.addEventListener('input', hideError);
+        
+        // Actualizar estado de autenticación en la interfaz
+        function updateAuthStatus() {
+            const authStatus = document.getElementById('auth-status');
+            const isAuthenticated = sessionStorage.getItem(AUTH_CONFIG.sessionKey);
+            
+            if (isAuthenticated) {
+                authStatus.innerHTML = '🔒 Autenticado como: admin';
+                authStatus.style.color = '#28a745';
+            } else {
+                authStatus.innerHTML = '🔓 No autenticado';
+                authStatus.style.color = '#dc3545';
+            }
+        }
+        
+        // Función para cerrar sesión
+        function logout() {
+            sessionStorage.removeItem(AUTH_CONFIG.sessionKey);
+            alert('Sesión cerrada');
+            showLoginModal();
         }
 
         // Función para formatear fecha
@@ -616,14 +424,8 @@
 
         // Función para cargar logs de una categoría
         async function loadLogs(category) {
-            if (!isAuthenticated) return;
-            
             try {
                 const response = await fetch(`${API_BASE}/logs?category=${category}`);
-                if (response.status === 401) {
-                    showLoginScreen();
-                    return;
-                }
                 const logs = await response.json();
                 renderLogs(category, logs);
             } catch (error) {
@@ -635,14 +437,8 @@
 
         // Función para cargar estado del sistema
         async function loadStatus() {
-            if (!isAuthenticated) return;
-            
             try {
                 const response = await fetch(`${API_BASE}/status`);
-                if (response.status === 401) {
-                    showLoginScreen();
-                    return;
-                }
                 const status = await response.json();
                 
                 // Actualizar contadores
@@ -686,16 +482,9 @@
 
         // Función para limpiar logs
         async function clearLogs(category = null) {
-            if (!isAuthenticated) return;
-            
             try {
                 const url = category ? `${API_BASE}/logs?category=${category}` : `${API_BASE}/logs`;
                 const response = await fetch(url, { method: 'DELETE' });
-                
-                if (response.status === 401) {
-                    showLoginScreen();
-                    return;
-                }
                 
                 if (response.ok) {
                     if (category) {
@@ -720,21 +509,14 @@
             }
         }
 
-        // Función para cerrar sesión
-        async function logout() {
-            try {
-                const response = await fetch('/logout', { method: 'POST' });
-                if (response.ok) {
-                    showLoginScreen();
-                }
-            } catch (error) {
-                console.error('Error al cerrar sesión:', error);
-                showLoginScreen();
-            }
-        }
-
         // Inicializar
         function init() {
+            // Verificar autenticación primero
+            checkAuth();
+            
+            // Actualizar estado de autenticación
+            updateAuthStatus();
+            
             refreshAll();
             
             // Configurar actualización automática cada 10 segundos
@@ -743,29 +525,8 @@
             }, 10000);
         }
 
-        // Verificar autenticación al cargar la página
-        async function checkAuth() {
-            try {
-                const response = await fetch(`${API_BASE}/status`);
-                if (response.status === 200) {
-                    showMainScreen();
-                } else {
-                    showLoginScreen();
-                }
-            } catch (error) {
-                console.log('Error verificando autenticación:', error);
-                showLoginScreen();
-            }
-        }
-
         // Inicializar cuando la página esté lista
-        document.addEventListener('DOMContentLoaded', () => {
-            const usernameInput = document.getElementById('username');
-            if (usernameInput) {
-                usernameInput.focus();
-            }
-            checkAuth();
-        });
+        document.addEventListener('DOMContentLoaded', init);
 
         // Limpiar intervalo cuando se cierre la página
         window.addEventListener('beforeunload', () => {
