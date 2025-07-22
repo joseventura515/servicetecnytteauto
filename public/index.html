@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tecnytte - Servicio Unificado</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚀</text></svg>">
     <style>
         * {
             margin: 0;
@@ -496,14 +497,21 @@
 
         function setLoading(loading) {
             const loginBtn = document.getElementById('loginBtn');
+            const loadingElement = document.getElementById('loading');
+            
+            if (!loginBtn || !loadingElement) {
+                console.error('Elementos de login no encontrados');
+                return;
+            }
+            
             if (loading) {
                 loginBtn.disabled = true;
                 loginBtn.textContent = 'Iniciando Sesión...';
-                document.getElementById('loading').style.display = 'inline-block';
+                loadingElement.style.display = 'inline-block';
             } else {
                 loginBtn.disabled = false;
                 loginBtn.textContent = 'Iniciar Sesión';
-                document.getElementById('loading').style.display = 'none';
+                loadingElement.style.display = 'none';
             }
         }
 
@@ -524,47 +532,57 @@
         }
 
         // Manejo del formulario de login
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
+        const loginForm = document.getElementById('loginForm');
+        if (loginForm) {
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const username = document.getElementById('username')?.value;
+                const password = document.getElementById('password')?.value;
 
-            if (!username || !password) {
-                showError('Por favor, completa todos los campos');
-                return;
-            }
-
-            hideError();
-            setLoading(true);
-
-            try {
-                const response = await fetch('/login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ username, password })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    showMainScreen();
-                } else {
-                    showError(data.message || 'Credenciales inválidas');
+                if (!username || !password) {
+                    showError('Por favor, completa todos los campos');
+                    return;
                 }
-            } catch (error) {
-                showError('Error de conexión. Intenta nuevamente.');
-                console.error('Error de login:', error);
-            } finally {
-                setLoading(false);
-            }
-        });
+
+                hideError();
+                setLoading(true);
+
+                try {
+                    const response = await fetch('/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ username, password })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        showMainScreen();
+                    } else {
+                        showError(data.message || 'Credenciales inválidas');
+                    }
+                } catch (error) {
+                    showError('Error de conexión. Intenta nuevamente.');
+                    console.error('Error de login:', error);
+                } finally {
+                    setLoading(false);
+                }
+            });
+        }
 
         // Limpiar error cuando el usuario empiece a escribir
-        document.getElementById('username').addEventListener('input', hideError);
-        document.getElementById('password').addEventListener('input', hideError);
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
+        
+        if (usernameInput) {
+            usernameInput.addEventListener('input', hideError);
+        }
+        if (passwordInput) {
+            passwordInput.addEventListener('input', hideError);
+        }
 
         // Función para formatear fecha
         function formatDate(dateString) {
@@ -735,14 +753,18 @@
                     showLoginScreen();
                 }
             } catch (error) {
+                console.log('Error verificando autenticación:', error);
                 showLoginScreen();
             }
         }
 
         // Inicializar cuando la página esté lista
         document.addEventListener('DOMContentLoaded', () => {
+            const usernameInput = document.getElementById('username');
+            if (usernameInput) {
+                usernameInput.focus();
+            }
             checkAuth();
-            document.getElementById('username').focus();
         });
 
         // Limpiar intervalo cuando se cierre la página

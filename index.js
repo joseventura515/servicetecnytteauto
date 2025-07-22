@@ -818,7 +818,7 @@ app.get('/login', (req, res) => {
     if (req.session.authenticated) {
         res.redirect('/');
     } else {
-        res.sendFile(path.join(__dirname, 'public', 'login.html'));
+        res.sendFile(path.join(__dirname, 'public', 'index.html'));
     }
 });
 
