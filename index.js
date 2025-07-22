@@ -722,18 +722,24 @@ async function processClientesProgramados() {
                 const fechaProgramada = new Date(cliente.fecha_hora_envio);
                 const fechaActual = new Date();
                 
+                // Ajustar fecha actual para comparar correctamente (restar 5 horas)
+                const fechaActualAjustada = new Date(fechaActual);
+                fechaActualAjustada.setHours(fechaActualAjustada.getHours() - 5);
+                
                 // Verificar si es la hora y minuto programado
-                const esHoraProgramada = fechaActual.getFullYear() === fechaProgramada.getFullYear() &&
-                                       fechaActual.getMonth() === fechaProgramada.getMonth() &&
-                                       fechaActual.getDate() === fechaProgramada.getDate() &&
-                                       fechaActual.getHours() === fechaProgramada.getHours() &&
-                                       fechaActual.getMinutes() === fechaProgramada.getMinutes();
+                const esHoraProgramada = fechaActualAjustada.getFullYear() === fechaProgramada.getFullYear() &&
+                                       fechaActualAjustada.getMonth() === fechaProgramada.getMonth() &&
+                                       fechaActualAjustada.getDate() === fechaProgramada.getDate() &&
+                                       fechaActualAjustada.getHours() === fechaProgramada.getHours() &&
+                                       fechaActualAjustada.getMinutes() === fechaProgramada.getMinutes();
 
                 if (esHoraProgramada) {
                     logger.addLog('COBRANZA', `Enviando mensaje programado: ${cliente.id}`, {
                         cliente: cliente.nombre,
                         numero: cliente.numero,
                         fechaProgramada: fechaProgramada.toLocaleString(),
+                        fechaActual: fechaActual.toLocaleString(),
+                        fechaActualAjustada: fechaActualAjustada.toLocaleString(),
                         repetirCadaDias: cliente.repetir_cada_dias
                     });
 
@@ -775,13 +781,19 @@ async function processClientesProgramados() {
 // Función para actualizar fecha_hora_envio en la base de datos
 async function actualizarFechaEnvio(clienteId, nuevaFecha) {
     try {
-        const fechaFormateada = nuevaFecha.toISOString().slice(0, 19).replace('T', ' ');
+        // Ajustar la zona horaria (restar 5 horas para compensar)
+        const fechaAjustada = new Date(nuevaFecha);
+        fechaAjustada.setHours(fechaAjustada.getHours() - 5);
+        
+        const fechaFormateada = fechaAjustada.toISOString().slice(0, 19).replace('T', ' ');
         await getDataFromDB(
             "UPDATE bot_clientes SET fecha_hora_envio = ? WHERE id = ?",
             [fechaFormateada, clienteId]
         );
         logger.addLog('COBRANZA', `Fecha actualizada en BD: ${clienteId}`, {
-            nuevaFecha: fechaFormateada
+            fechaOriginal: nuevaFecha.toLocaleString(),
+            fechaAjustada: fechaFormateada,
+            ajuste: '-5 horas'
         });
     } catch (error) {
         logger.addLog('COBRANZA', `Error actualizando fecha en BD: ${clienteId}`, {
