@@ -647,62 +647,103 @@ async function processReplica() {
             return;
         }
 
-        // Para REPLICA, usar las URLs y API Keys de la primera simulación (asumiendo que todas usan las mismas)
-        const trackerUrlOrigen = simulacionesValidas[0].tracker_url_origen || process.env.TECNYTTE_TRACKER_URL || 'https://gps.tecnytte.com';
-        const apiKeyOrigen = simulacionesValidas[0].api_key_origen || process.env.API_KEY;
-        const trackerUrlDestino = simulacionesValidas[0].tracker_url_destino || process.env.TECNYTTE_TRACKER_URL || 'https://gps.tecnytte.com';
+        logger.addLog('REPLICA', `Procesando ${simulacionesValidas.length} simulaciones de réplica`);
 
-        logger.addLog('REPLICA', 'Configuración de réplica', {
-            trackerUrlOrigen,
-            trackerUrlDestino,
-            cantidadSimulaciones: simulacionesValidas.length
-        });
-
-        const data = await getData(imeisReal, trackerUrlOrigen, apiKeyOrigen);
-
+        // Agrupar simulaciones por servidor origen para optimizar las consultas
+        const simulacionesPorOrigen = {};
+        
         for (const simulacion of simulacionesValidas) {
+            const trackerUrlOrigen = simulacion.tracker_url_origen || process.env.TECNYTTE_TRACKER_URL || 'https://gps.tecnytte.com';
+            const apiKeyOrigen = simulacion.api_key_origen || process.env.API_KEY;
+            const claveOrigen = `${trackerUrlOrigen}|${apiKeyOrigen}`;
+            
+            if (!simulacionesPorOrigen[claveOrigen]) {
+                simulacionesPorOrigen[claveOrigen] = {
+                    trackerUrlOrigen,
+                    apiKeyOrigen,
+                    simulaciones: [],
+                    imeis: []
+                };
+            }
+            
+            simulacionesPorOrigen[claveOrigen].simulaciones.push(simulacion);
+            simulacionesPorOrigen[claveOrigen].imeis.push(simulacion.imei_real);
+        }
+
+        // Procesar cada grupo de simulaciones por servidor origen
+        for (const claveOrigen in simulacionesPorOrigen) {
+            const grupo = simulacionesPorOrigen[claveOrigen];
+            const imeisGrupo = grupo.imeis.filter(imei => imei && imei.trim() !== '').join(';');
+            
+            if (!imeisGrupo) {
+                logger.addLog('REPLICA', 'No hay IMEIs válidos en este grupo', {
+                    trackerUrlOrigen: grupo.trackerUrlOrigen
+                });
+                continue;
+            }
+
+            logger.addLog('REPLICA', 'Obteniendo datos del servidor origen', {
+                trackerUrlOrigen: grupo.trackerUrlOrigen,
+                cantidadSimulaciones: grupo.simulaciones.length,
+                imeis: imeisGrupo
+            });
+
             try {
-                const imei = simulacion.imei_real;
-                const item = data[imei];
+                const data = await getData(imeisGrupo, grupo.trackerUrlOrigen, grupo.apiKeyOrigen);
 
-                if (item) {
-                    const params = formatParams(item.params);
-                    const event = mapEvent(item.params.alarm);
-                    const dataBody = createDataBody(simulacion.imei, item, params, event);
-
-                    // Usar la URL de destino específica de cada simulación
-                    const urlDestino = simulacion.tracker_url_destino || trackerUrlDestino;
-
+                for (const simulacion of grupo.simulaciones) {
                     try {
-                        const response = await axios.post(`${urlDestino}/api/api_loc_v2.php`, { imeis: [dataBody] });
-                        logger.addLog('REPLICA', 'Datos enviados correctamente al servidor destino', {
-                            imei: simulacion.imei,
-                            imei_real: imei,
-                            trackerUrlOrigen,
-                            trackerUrlDestino: urlDestino,
-                            response: response.data
-                        });
+                        const imei = simulacion.imei_real;
+                        const item = data[imei];
+
+                        // Obtener URLs específicas de esta simulación
+                        const trackerUrlOrigen = simulacion.tracker_url_origen || process.env.TECNYTTE_TRACKER_URL || 'https://gps.tecnytte.com';
+                        const trackerUrlDestino = simulacion.tracker_url_destino || process.env.TECNYTTE_TRACKER_URL || 'https://gps.tecnytte.com';
+
+                        if (item) {
+                            const params = formatParams(item.params);
+                            const event = mapEvent(item.params.alarm);
+                            const dataBody = createDataBody(simulacion.imei, item, params, event);
+
+                            try {
+                                const response = await axios.post(`${trackerUrlDestino}/api/api_loc_v2.php`, { imeis: [dataBody] });
+                                logger.addLog('REPLICA', 'Datos enviados correctamente al servidor destino', {
+                                    imei: simulacion.imei,
+                                    imei_real: imei,
+                                    trackerUrlOrigen,
+                                    trackerUrlDestino,
+                                    response: response.data
+                                });
+                            } catch (error) {
+                                logger.addLog('REPLICA', 'Error al enviar datos al servidor destino', {
+                                    imei: simulacion.imei,
+                                    imei_real: imei,
+                                    trackerUrlOrigen,
+                                    trackerUrlDestino,
+                                    error: error.message
+                                });
+                            }
+                        } else {
+                            logger.addLog('REPLICA', 'No se encontraron datos para IMEI en servidor origen', {
+                                imei: simulacion.imei,
+                                imei_real: imei,
+                                trackerUrlOrigen
+                            });
+                        }
                     } catch (error) {
-                        logger.addLog('REPLICA', 'Error al enviar datos al servidor destino', {
+                        logger.addLog('REPLICA', `Error procesando simulación: ${simulacion.id}`, {
                             imei: simulacion.imei,
-                            imei_real: imei,
-                            trackerUrlDestino: urlDestino,
                             error: error.message
                         });
+                        continue;
                     }
-                } else {
-                    logger.addLog('REPLICA', 'No se encontraron datos para IMEI en servidor origen', {
-                        imei: simulacion.imei,
-                        imei_real: imei,
-                        trackerUrlOrigen
-                    });
                 }
             } catch (error) {
-                logger.addLog('REPLICA', `Error procesando simulación: ${simulacion.id}`, {
-                    imei: simulacion.imei,
+                logger.addLog('REPLICA', 'Error al obtener datos del servidor origen', {
+                    trackerUrlOrigen: grupo.trackerUrlOrigen,
                     error: error.message
                 });
-                continue; // Continuar con la siguiente simulación
+                continue;
             }
         }
     } catch (error) {
