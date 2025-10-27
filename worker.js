@@ -34,7 +34,7 @@ function calcularVelocidad(distanciaMetros, tiempoSegundos) {
     return Math.min(Math.round(velocidadKmh), 100);
 }
 
-async function enviarDatosPausa(imei, latitud, longitud, fechaBase, cantidadPuntos, intervaloDisponible) {
+async function enviarDatosPausa(imei, latitud, longitud, fechaBase, cantidadPuntos, intervaloDisponible, trackerUrlDestino) {
     if (cantidadPuntos < 1 || cantidadPuntos > 2) {
         console.log('**************PARADA CANCELADA*********************');
         console.log(`Cantidad de puntos inválida: ${cantidadPuntos}`);
@@ -52,6 +52,7 @@ async function enviarDatosPausa(imei, latitud, longitud, fechaBase, cantidadPunt
     
     console.log('**************INICIO ENVIANDO PARADA*********************');
     console.log(`SIMULANDO PARADA con ${cantidadPuntos} punto(s) en: Latitud ${latitud}, Longitud ${longitud}`);
+    console.log(`Servidor destino: ${trackerUrlDestino}`);
     
     const fechaBaseObj = new Date(fechaBase.replace(/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/, '$1/$2/$3 $4:$5:$6'));
     fechaBaseObj.setTime(fechaBaseObj.getTime() + 1000);
@@ -59,7 +60,7 @@ async function enviarDatosPausa(imei, latitud, longitud, fechaBase, cantidadPunt
 
     console.log(`Fecha original: ${fechaBase} -> Fecha inicial de parada: ${fechaInicial}`);
 
-    const urlInicial = `https://gps.tecnytte.com/api/api_loc.php?imei=${imei}&lat=${latitud}&lng=${longitud}&altitude=100&angle=0&speed=0&loc_valid=1&dt_tracker=${fechaInicial}&dt_server=${fechaInicial}&params=ignition=0|sos=0|`;
+    const urlInicial = `${trackerUrlDestino}/api/api_loc.php?imei=${imei}&lat=${latitud}&lng=${longitud}&altitude=100&angle=0&speed=0&loc_valid=1&dt_tracker=${fechaInicial}&dt_server=${fechaInicial}&params=ignition=0|sos=0|`;
 
     try {
         const responseInicial = await axios.get(urlInicial);
@@ -78,7 +79,7 @@ async function enviarDatosPausa(imei, latitud, longitud, fechaBase, cantidadPunt
         
         console.log(`Enviando punto adicional de parada ${i+1}/${cantidadPuntos} a las ${fechaPausa} (incremento exacto: 61 segundos)`);
         
-        const url = `https://gps.tecnytte.com/api/api_loc.php?imei=${imei}&lat=${latitud}&lng=${longitud}&altitude=100&angle=0&speed=0&loc_valid=1&dt_tracker=${fechaPausa}&dt_server=${fechaPausa}&params=ignition=0|sos=0|`;
+        const url = `${trackerUrlDestino}/api/api_loc.php?imei=${imei}&lat=${latitud}&lng=${longitud}&altitude=100&angle=0&speed=0&loc_valid=1&dt_tracker=${fechaPausa}&dt_server=${fechaPausa}&params=ignition=0|sos=0|`;
 
         try {
             const response = await axios.get(url);
@@ -93,10 +94,11 @@ async function enviarDatosPausa(imei, latitud, longitud, fechaBase, cantidadPunt
     console.log('**************FIN ENVIANDO PARADA*********************');
 }
 
-async function enviarDatosPosicion(fechaHoraInicial, fechaHoraFinal, cantidadPuntos, puntos, imei, tipoSimulacion) {
+async function enviarDatosPosicion(fechaHoraInicial, fechaHoraFinal, cantidadPuntos, puntos, imei, tipoSimulacion, trackerUrlDestino) {
     const tiempoTotal = fechaHoraFinal - fechaHoraInicial;
     const intervaloTiempo = tiempoTotal / cantidadPuntos;
     console.log("Se va a enviar la data cada: " + intervaloTiempo / 60000 + " Minutos");
+    console.log("Servidor destino: " + trackerUrlDestino);
 
     const puntosArray = puntos.split(',');
     const puntosLatLong = [];
@@ -140,7 +142,7 @@ async function enviarDatosPosicion(fechaHoraInicial, fechaHoraFinal, cantidadPun
         console.log(`Enviando datos de posición: Latitud ${puntosLatLong[i].latitud}, Longitud ${puntosLatLong[i].longitud}, Velocidad: ${speed} km/h`);
         console.log(`Se está enviando cada: ${intervaloTiempo / 60000} Minutos`);
 
-        const url = `https://gps.tecnytte.com/api/api_loc.php?imei=${imei}&lat=${puntosLatLong[i].latitud}&lng=${puntosLatLong[i].longitud}&altitude=100&angle=45&speed=${speed}&loc_valid=1&dt_tracker=${fechaActual}&dt_server=${fechaActual}&params=ignition=1|sos=0|`;
+        const url = `${trackerUrlDestino}/api/api_loc.php?imei=${imei}&lat=${puntosLatLong[i].latitud}&lng=${puntosLatLong[i].longitud}&altitude=100&angle=45&speed=${speed}&loc_valid=1&dt_tracker=${fechaActual}&dt_server=${fechaActual}&params=ignition=1|sos=0|`;
 
         console.log(url);
         
@@ -165,7 +167,7 @@ async function enviarDatosPosicion(fechaHoraInicial, fechaHoraFinal, cantidadPun
                 console.log(`Calculado ${cantidadPuntos} punto(s) para esta parada`);
                 
                 if (cantidadPuntos >= 1) {
-                    enviarDatosPausa(imei, puntosLatLong[i].latitud, puntosLatLong[i].longitud, fechaActual, cantidadPuntos, tiempoDisponible);
+                    enviarDatosPausa(imei, puntosLatLong[i].latitud, puntosLatLong[i].longitud, fechaActual, cantidadPuntos, tiempoDisponible, trackerUrlDestino);
                 }
             } else {
                 console.log(`Tiempo disponible para parada: ${tiempoDisponible/1000} segundos (insuficiente, se omite la parada)`);
@@ -192,7 +194,15 @@ async function enviarDatosPosicion(fechaHoraInicial, fechaHoraFinal, cantidadPun
 }
 
 // Ejecutar la función enviarDatosPosicion() con los datos proporcionados
-enviarDatosPosicion(workerData.fechaHoraInicial, workerData.fechaHoraFinal, workerData.cantidadPuntos, workerData.puntos, workerData.imei, workerData.tipoSimulacion);
+enviarDatosPosicion(
+    workerData.fechaHoraInicial, 
+    workerData.fechaHoraFinal, 
+    workerData.cantidadPuntos, 
+    workerData.puntos, 
+    workerData.imei, 
+    workerData.tipoSimulacion,
+    workerData.trackerUrlDestino || 'https://gps.tecnytte.com'
+);
 
 // Informar al hilo principal que el trabajo ha terminado
 parentPort.postMessage({ status: 'COMPLETED' }); 

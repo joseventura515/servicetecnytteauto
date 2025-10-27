@@ -145,14 +145,15 @@ function calcularVelocidad(distanciaMetros, tiempoSegundos) {
 }
 
 // Función para enviar datos de posición
-async function enviarDatosPosicion(fechaHoraInicial, fechaHoraFinal, cantidadPuntos, puntos, imei, tipoSimulacion) {
+async function enviarDatosPosicion(fechaHoraInicial, fechaHoraFinal, cantidadPuntos, puntos, imei, tipoSimulacion, trackerUrlDestino) {
     const tiempoTotal = fechaHoraFinal - fechaHoraInicial;
     const intervaloTiempo = tiempoTotal / cantidadPuntos;
     
     logger.addLog(tipoSimulacion === 'REALTIME' ? 'AUTORUTA_REALTIME' : 'AUTORUTA_PASTTIME', 
         `Iniciando simulación ${tipoSimulacion} para IMEI: ${imei}`, {
             cantidadPuntos,
-            intervaloTiempo: intervaloTiempo / 60000 + ' minutos'
+            intervaloTiempo: intervaloTiempo / 60000 + ' minutos',
+            trackerUrlDestino
         });
 
     const puntosArray = puntos.split(',');
@@ -191,7 +192,7 @@ async function enviarDatosPosicion(fechaHoraInicial, fechaHoraFinal, cantidadPun
             }
         }
         
-        const url = `${process.env.TECNYTTE_TRACKER_URL}/api/api_loc.php?imei=${imei}&lat=${puntosLatLong[i].latitud}&lng=${puntosLatLong[i].longitud}&altitude=100&angle=45&speed=${speed}&loc_valid=1&dt_tracker=${fechaActual}&dt_server=${fechaActual}&params=ignition=1|sos=0|`;
+        const url = `${trackerUrlDestino}/api/api_loc.php?imei=${imei}&lat=${puntosLatLong[i].latitud}&lng=${puntosLatLong[i].longitud}&altitude=100&angle=45&speed=${speed}&loc_valid=1&dt_tracker=${fechaActual}&dt_server=${fechaActual}&params=ignition=1|sos=0|`;
 
         try {
             const response = await axios.get(url);
@@ -203,14 +204,16 @@ async function enviarDatosPosicion(fechaHoraInicial, fechaHoraFinal, cantidadPun
                     latitud: puntosLatLong[i].latitud,
                     longitud: puntosLatLong[i].longitud,
                     velocidad: speed,
-                    fecha: fechaActual
+                    fecha: fechaActual,
+                    trackerUrlDestino
                 });
         } catch (error) {
             logger.addLog(tipoSimulacion === 'REALTIME' ? 'AUTORUTA_REALTIME' : 'AUTORUTA_PASTTIME', 
                 `Error al enviar punto`, {
                     imei,
                     punto: i + 1,
-                    error: error.message
+                    error: error.message,
+                    trackerUrlDestino
                 });
         }
         
@@ -225,7 +228,7 @@ async function enviarDatosPosicion(fechaHoraInicial, fechaHoraFinal, cantidadPun
                 const cantidadPuntos = Math.min(Math.floor(tiempoDisponible / tiempoMinimoPorPunto), 2);
                 
                 if (cantidadPuntos >= 1) {
-                    await enviarDatosPausa(imei, puntosLatLong[i].latitud, puntosLatLong[i].longitud, fechaActual, cantidadPuntos, tiempoDisponible, tipoSimulacion);
+                    await enviarDatosPausa(imei, puntosLatLong[i].latitud, puntosLatLong[i].longitud, fechaActual, cantidadPuntos, tiempoDisponible, tipoSimulacion, trackerUrlDestino);
                 }
             }
         }
@@ -245,7 +248,7 @@ async function enviarDatosPosicion(fechaHoraInicial, fechaHoraFinal, cantidadPun
 }
 
 // Función para enviar datos de pausa
-async function enviarDatosPausa(imei, latitud, longitud, fechaBase, cantidadPuntos, intervaloDisponible, tipoSimulacion) {
+async function enviarDatosPausa(imei, latitud, longitud, fechaBase, cantidadPuntos, intervaloDisponible, tipoSimulacion, trackerUrlDestino) {
     if (cantidadPuntos < 1 || cantidadPuntos > 2) {
         logger.addLog(tipoSimulacion === 'REALTIME' ? 'AUTORUTA_REALTIME' : 'AUTORUTA_PASTTIME', 
             'Parada cancelada - cantidad de puntos inválida', { cantidadPuntos });
@@ -276,15 +279,15 @@ async function enviarDatosPausa(imei, latitud, longitud, fechaBase, cantidadPunt
     fechaBaseObj.setTime(fechaBaseObj.getTime() + 1000);
     const fechaInicial = formatearHora(fechaBaseObj);
 
-    const urlInicial = `${process.env.TECNYTTE_TRACKER_URL}/api/api_loc.php?imei=${imei}&lat=${latitud}&lng=${longitud}&altitude=100&angle=0&speed=0&loc_valid=1&dt_tracker=${fechaInicial}&dt_server=${fechaInicial}&params=ignition=0|sos=0|`;
+    const urlInicial = `${trackerUrlDestino}/api/api_loc.php?imei=${imei}&lat=${latitud}&lng=${longitud}&altitude=100&angle=0&speed=0&loc_valid=1&dt_tracker=${fechaInicial}&dt_server=${fechaInicial}&params=ignition=0|sos=0|`;
 
     try {
         const responseInicial = await axios.get(urlInicial);
         logger.addLog(tipoSimulacion === 'REALTIME' ? 'AUTORUTA_REALTIME' : 'AUTORUTA_PASTTIME', 
-            'Punto inicial de parada enviado', { imei, fecha: fechaInicial });
+            'Punto inicial de parada enviado', { imei, fecha: fechaInicial, trackerUrlDestino });
     } catch (error) {
         logger.addLog(tipoSimulacion === 'REALTIME' ? 'AUTORUTA_REALTIME' : 'AUTORUTA_PASTTIME', 
-            'Error al enviar punto inicial de parada', { imei, error: error.message });
+            'Error al enviar punto inicial de parada', { imei, error: error.message, trackerUrlDestino });
     }
     
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -295,7 +298,7 @@ async function enviarDatosPausa(imei, latitud, longitud, fechaBase, cantidadPunt
         fechaBaseObj.setTime(fechaBaseObj.getTime() + incrementoTiempo);
         const fechaPausa = formatearHora(fechaBaseObj);
         
-        const url = `${process.env.TECNYTTE_TRACKER_URL}/api/api_loc.php?imei=${imei}&lat=${latitud}&lng=${longitud}&altitude=100&angle=0&speed=0&loc_valid=1&dt_tracker=${fechaPausa}&dt_server=${fechaPausa}&params=ignition=0|sos=0|`;
+        const url = `${trackerUrlDestino}/api/api_loc.php?imei=${imei}&lat=${latitud}&lng=${longitud}&altitude=100&angle=0&speed=0&loc_valid=1&dt_tracker=${fechaPausa}&dt_server=${fechaPausa}&params=ignition=0|sos=0|`;
 
         try {
             const response = await axios.get(url);
@@ -303,11 +306,12 @@ async function enviarDatosPausa(imei, latitud, longitud, fechaBase, cantidadPunt
                 `Punto adicional de parada enviado`, { 
                     imei, 
                     punto: i + 1, 
-                    fecha: fechaPausa 
+                    fecha: fechaPausa,
+                    trackerUrlDestino
                 });
         } catch (error) {
             logger.addLog(tipoSimulacion === 'REALTIME' ? 'AUTORUTA_REALTIME' : 'AUTORUTA_PASTTIME', 
-                'Error al enviar punto adicional de parada', { imei, error: error.message });
+                'Error al enviar punto adicional de parada', { imei, error: error.message, trackerUrlDestino });
         }
         
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -459,13 +463,20 @@ async function enviarMensaje(cliente, index) {
     }
 }
 
-// Función para obtener datos por IMEI
-async function getData(imeis) {
+// Función para obtener datos por IMEI (usado en REPLICA)
+async function getData(imeis, trackerUrlOrigen, apiKeyOrigen) {
     try {
-        const response = await axios.get(`${process.env.TECNYTTE_TRACKER_URL}/api/api.php?api=server&ver=1.0&key=${process.env.API_KEY}&cmd=GET_OBJECTS_ONLINE_AND_NOT_ONLINE_DATA,${imeis}`);
+        const response = await axios.get(`${trackerUrlOrigen}/api/api.php?api=server&ver=1.0&key=${apiKeyOrigen}&cmd=GET_OBJECTS_ONLINE_AND_NOT_ONLINE_DATA,${imeis}`);
+        logger.addLog('REPLICA', 'Datos obtenidos correctamente del servidor origen', {
+            trackerUrlOrigen,
+            cantidadImeis: imeis.split(';').length
+        });
         return response.data;
     } catch (error) {
-        logger.addLog('REPLICA', 'Error al obtener datos del IMEI', { error: error.message });
+        logger.addLog('REPLICA', 'Error al obtener datos del IMEI desde servidor origen', { 
+            error: error.message,
+            trackerUrlOrigen
+        });
         throw error;
     }
 }
@@ -538,10 +549,14 @@ async function processAutoRuta() {
                                 fechaHoraActual.getMinutes() === fechaLanzamiento.getMinutes();
 
                 if (sonIguales) {
+                    // Obtener URLs del tracker desde la base de datos o usar valores por defecto
+                    const trackerUrlDestino = simulacion.tracker_url_destino || process.env.TECNYTTE_TRACKER_URL || 'https://gps.tecnytte.com';
+                    
                     logger.addLog('AUTORUTA_PASTTIME', `Iniciando simulación activa: ${simulacion.id}`, {
                         imei,
                         tipoSimulacion,
-                        fechaLanzamiento: fechaLanzamiento.toLocaleString()
+                        fechaLanzamiento: fechaLanzamiento.toLocaleString(),
+                        trackerUrlDestino
                     });
 
                     fechaHoraInicial.setHours(fechaHoraInicial.getHours() + 5);
@@ -554,6 +569,7 @@ async function processAutoRuta() {
                         cantidadPuntos: cantidadPuntos,
                         puntos: puntos,
                         tipoSimulacion: tipoSimulacion,
+                        trackerUrlDestino: trackerUrlDestino
                     };
 
                     const worker = new Worker('./worker.js', { workerData: datosHilo });
@@ -631,7 +647,18 @@ async function processReplica() {
             return;
         }
 
-        const data = await getData(imeisReal);
+        // Para REPLICA, usar las URLs y API Keys de la primera simulación (asumiendo que todas usan las mismas)
+        const trackerUrlOrigen = simulacionesValidas[0].tracker_url_origen || process.env.TECNYTTE_TRACKER_URL || 'https://gps.tecnytte.com';
+        const apiKeyOrigen = simulacionesValidas[0].api_key_origen || process.env.API_KEY;
+        const trackerUrlDestino = simulacionesValidas[0].tracker_url_destino || process.env.TECNYTTE_TRACKER_URL || 'https://gps.tecnytte.com';
+
+        logger.addLog('REPLICA', 'Configuración de réplica', {
+            trackerUrlOrigen,
+            trackerUrlDestino,
+            cantidadSimulaciones: simulacionesValidas.length
+        });
+
+        const data = await getData(imeisReal, trackerUrlOrigen, apiKeyOrigen);
 
         for (const simulacion of simulacionesValidas) {
             try {
@@ -643,24 +670,31 @@ async function processReplica() {
                     const event = mapEvent(item.params.alarm);
                     const dataBody = createDataBody(simulacion.imei, item, params, event);
 
+                    // Usar la URL de destino específica de cada simulación
+                    const urlDestino = simulacion.tracker_url_destino || trackerUrlDestino;
+
                     try {
-                        const response = await axios.post(`${process.env.TECNYTTE_TRACKER_URL}/api/api_loc_v2.php`, { imeis: [dataBody] });
-                        logger.addLog('REPLICA', 'Datos enviados correctamente', {
+                        const response = await axios.post(`${urlDestino}/api/api_loc_v2.php`, { imeis: [dataBody] });
+                        logger.addLog('REPLICA', 'Datos enviados correctamente al servidor destino', {
                             imei: simulacion.imei,
                             imei_real: imei,
+                            trackerUrlOrigen,
+                            trackerUrlDestino: urlDestino,
                             response: response.data
                         });
                     } catch (error) {
-                        logger.addLog('REPLICA', 'Error al enviar datos', {
+                        logger.addLog('REPLICA', 'Error al enviar datos al servidor destino', {
                             imei: simulacion.imei,
                             imei_real: imei,
+                            trackerUrlDestino: urlDestino,
                             error: error.message
                         });
                     }
                 } else {
-                    logger.addLog('REPLICA', 'No se encontraron datos para IMEI', {
+                    logger.addLog('REPLICA', 'No se encontraron datos para IMEI en servidor origen', {
                         imei: simulacion.imei,
-                        imei_real: imei
+                        imei_real: imei,
+                        trackerUrlOrigen
                     });
                 }
             } catch (error) {
