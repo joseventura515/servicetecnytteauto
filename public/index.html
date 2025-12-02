@@ -290,6 +290,17 @@
             min-height: 60px;
         }
 
+        .config-item .hint {
+            font-size: 0.85em;
+            color: #6c757d;
+            margin-top: 3px;
+            font-style: italic;
+        }
+
+        .config-item .hint::before {
+            content: "💡 ";
+        }
+
         .config-actions {
             display: flex;
             justify-content: flex-end;
@@ -350,6 +361,11 @@
                     <h3>📅 Programados</h3>
                     <p>Estado: <span id="programados-status">Activo</span></p>
                     <p>Verificación: <span id="programados-last">Cada minuto</span></p>
+                </div>
+                <div class="status-card">
+                    <h3>💰 Verificación Deuda</h3>
+                    <p>Estado: <span id="verificacion-deuda-status">Cargando...</span></p>
+                    <p>Última ejecución: <span id="verificacion-deuda-last">-</span></p>
                 </div>
             </div>
         </div>
@@ -528,18 +544,39 @@
                         <div class="config-item">
                             <label for="AUTORUTA_INTERVAL">Intervalo Autoruta (ms):</label>
                             <input type="number" id="AUTORUTA_INTERVAL" name="AUTORUTA_INTERVAL" required>
+                            <div class="hint">Tiempo en milisegundos entre cada verificación de simulaciones de autoruta</div>
                         </div>
                         <div class="config-item">
                             <label for="REPLICA_INTERVAL">Intervalo Réplica (ms):</label>
                             <input type="number" id="REPLICA_INTERVAL" name="REPLICA_INTERVAL" required>
+                            <div class="hint">Tiempo en milisegundos entre cada verificación de simulaciones de réplica</div>
                         </div>
                         <div class="config-item">
                             <label for="COBRANZA_SCHEDULE">Horario Cobranza (cron):</label>
                             <input type="text" id="COBRANZA_SCHEDULE" name="COBRANZA_SCHEDULE" required>
+                            <div class="hint">Horario en formato cron para enviar mensajes de cobranza a clientes en estado DEUDA. Ejemplo: "30 11 * * *" (11:30 AM diario)</div>
                         </div>
                         <div class="config-item">
                             <label for="MESSAGE_DELAY">Delay Mensajes (ms):</label>
                             <input type="number" id="MESSAGE_DELAY" name="MESSAGE_DELAY" required>
+                            <div class="hint">Tiempo de espera en milisegundos entre el envío de cada mensaje de cobranza</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Verificación Automática de Deuda -->
+                <div class="config-section">
+                    <h3>💰 Verificación Automática de Deuda</h3>
+                    <div class="config-grid">
+                        <div class="config-item">
+                            <label for="DEUDA_CHECK_SCHEDULE">Horario Verificación Deuda (cron):</label>
+                            <input type="text" id="DEUDA_CHECK_SCHEDULE" name="DEUDA_CHECK_SCHEDULE" required>
+                            <div class="hint">Horario diario en formato cron para verificar y actualizar estados de clientes a DEUDA. Ejemplo: "0 10 * * *" (10:00 AM diario). Formato: "minuto hora * * *"</div>
+                        </div>
+                        <div class="config-item">
+                            <label for="DEUDA_DIA_DEFAULT">Día de Cobro por Defecto:</label>
+                            <input type="number" id="DEUDA_DIA_DEFAULT" name="DEUDA_DIA_DEFAULT" min="1" max="31" required>
+                            <div class="hint">Día del mes (1-31) que se usará para clientes que no tengan el campo dia_cobro configurado. Por defecto: 13</div>
                         </div>
                     </div>
                 </div>
@@ -757,12 +794,15 @@
                 document.getElementById('realtime-status').textContent = 'Activo';
                 document.getElementById('replica-status').textContent = 'Activo';
                 document.getElementById('cobranza-status').textContent = 'Programado';
+                document.getElementById('verificacion-deuda-status').textContent = 'Programado';
                 
                 // Actualizar últimas ejecuciones
                 document.getElementById('autoruta-last').textContent = formatDate(status.services.autoruta.lastRun);
                 document.getElementById('realtime-last').textContent = formatDate(status.services.autoruta.lastRun);
                 document.getElementById('replica-last').textContent = formatDate(status.services.replica.lastRun);
                 document.getElementById('cobranza-last').textContent = formatDate(status.timestamp);
+                document.getElementById('verificacion-deuda-last').textContent = status.services.verificacionDeuda ? 
+                    `Horario: ${status.services.verificacionDeuda.schedule}` : 'No configurado';
                 
             } catch (error) {
                 console.error('Error cargando estado:', error);

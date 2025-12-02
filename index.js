@@ -8,7 +8,7 @@ const path = require('path');
 require('dotenv').config({ path: './config.env' });
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3014;
 
 // Middleware
 app.use(cors());
@@ -97,6 +97,9 @@ class Logger {
 }
 
 const logger = new Logger();
+
+// Variable global para el cron job de verificación de deuda
+let deudaCheckCron = null;
 
 // Función para crear conexión a la base de datos
 function createConnection() {
@@ -867,6 +870,201 @@ async function actualizarFechaEnvio(clienteId, nuevaFecha) {
     }
 }
 
+// Función para parsear desde_mesanio_deuda (formato: "SEPTIEMBRE2024" o "NOVIEMBRE2024-CANCELADO")
+function parsearMesAnio(mesanio) {
+    if (!mesanio || typeof mesanio !== 'string') {
+        return null;
+    }
+    
+    const meses = {
+        'ENERO': 0, 'FEBRERO': 1, 'MARZO': 2, 'ABRIL': 3,
+        'MAYO': 4, 'JUNIO': 5, 'JULIO': 6, 'AGOSTO': 7,
+        'SEPTIEMBRE': 8, 'OCTUBRE': 9, 'NOVIEMBRE': 10, 'DICIEMBRE': 11
+    };
+    
+    // Limpiar el string y extraer solo la parte MESANIO (antes de guiones, espacios, etc.)
+    const limpio = mesanio.trim().toUpperCase();
+    // Buscar patrón: MES seguido de 4 dígitos (puede haber texto después)
+    const match = limpio.match(/^([A-Z]+)(\d{4})/);
+    if (!match) {
+        return null;
+    }
+    
+    const mesNombre = match[1];
+    const anio = parseInt(match[2]);
+    
+    if (!meses[mesNombre]) {
+        return null;
+    }
+    
+    return {
+        mes: meses[mesNombre],
+        anio: anio,
+        mesNombre: mesNombre
+    };
+}
+
+// Función para obtener clientes que necesitan verificación de deuda
+async function getClientesParaVerificacionDeuda() {
+    try {
+        // Obtener SOLO clientes tipo "normal", en estado "OK" que tengan desde_mesanio_deuda
+        const results = await getDataFromDB(
+            "SELECT * FROM bot_clientes WHERE TRIM(estado) = 'OK' AND TRIM(tipo_cliente) = 'NORMAL' AND desde_mesanio_deuda IS NOT NULL AND desde_mesanio_deuda != ''"
+        );
+        logger.addLog('COBRANZA', `Clientes tipo NORMAL en estado OK para verificación de deuda: ${results.length}`);
+        return results;
+    } catch (error) {
+        logger.addLog('COBRANZA', 'Error al obtener clientes para verificación de deuda', { error: error.message });
+        throw error;
+    }
+}
+
+// Función para actualizar estado a DEUDA
+async function actualizarEstadoDeuda(clienteId) {
+    try {
+        await getDataFromDB(
+            "UPDATE bot_clientes SET estado = 'DEUDA' WHERE id = ?",
+            [clienteId]
+        );
+        logger.addLog('COBRANZA', `Estado actualizado a DEUDA: ${clienteId}`);
+    } catch (error) {
+        logger.addLog('COBRANZA', `Error actualizando estado a DEUDA: ${clienteId}`, {
+            error: error.message
+        });
+        throw error;
+    }
+}
+
+// Función principal de verificación de deuda automática
+async function processVerificacionDeuda() {
+    try {
+        logger.addLog('COBRANZA', 'Iniciando verificación automática de deuda');
+        const clientes = await getClientesParaVerificacionDeuda();
+        logger.addLog('COBRANZA', `Iniciando verificación de deuda para ${clientes.length} clientes tipo NORMAL en estado OK`);
+        
+        const fechaActual = new Date();
+        const diaActual = fechaActual.getDate();
+        // getMonth() devuelve 0-11, pero para comparaciones usamos 0-11
+        const mesActual = fechaActual.getMonth(); // 0-11 (diciembre = 11)
+        const mesActualNumero = mesActual + 1; // 1-12 para mostrar (diciembre = 12)
+        const anioActual = fechaActual.getFullYear();
+        
+        logger.addLog('COBRANZA', `Fecha actual: ${diaActual}/${mesActualNumero}/${anioActual}`, {
+            diaActual,
+            mesActual: mesActualNumero,
+            anioActual
+        });
+        
+        // Obtener día por defecto de configuración
+        const diaDefault = parseInt(process.env.DEUDA_DIA_DEFAULT) || 13;
+        
+        // Contadores para logs
+        let clientesQueDeben = 0; // Clientes que tienen deuda (mes anterior al actual)
+        let clientesConDiaCobroHoy = 0; // Clientes que deben Y tienen día de cobro hoy
+        let clientesActualizados = 0; // Clientes que se actualizaron a DEUDA
+        const clientesActualizadosLista = []; // Lista de clientes actualizados
+        
+        logger.addLog('COBRANZA', `Buscando clientes con deuda desde cualquier mes anterior a ${mesActualNumero}/${anioActual} y día de cobro = ${diaActual}`);
+        
+        for (const cliente of clientes) {
+            try {
+                // Parsear desde_mesanio_deuda
+                const mesAnio = parsearMesAnio(cliente.desde_mesanio_deuda);
+                
+                if (!mesAnio) {
+                    // Formato inválido, saltar
+                    continue;
+                }
+                
+                // Verificar que el mes de deuda sea ANTERIOR al mes actual
+                // Puede ser 1, 2, 3 meses o más atrás
+                // mesAnio.mes está en formato 0-11 (como getMonth())
+                const fechaDeuda = new Date(mesAnio.anio, mesAnio.mes, 1);
+                const fechaActualInicio = new Date(anioActual, mesActual, 1);
+                
+                // Si la fecha de deuda es anterior a la fecha actual (mes anterior)
+                const esMesAnterior = fechaDeuda < fechaActualInicio;
+                
+                if (!esMesAnterior) {
+                    // No es un mes anterior, no hacer nada
+                    continue;
+                }
+                
+                // Este cliente DEBE (tiene deuda de un mes anterior)
+                clientesQueDeben++;
+                
+                // Obtener día de cobro (del cliente o por defecto)
+                const diaCobro = cliente.dia_cobro ? parseInt(cliente.dia_cobro) : diaDefault;
+                
+                // Validar que diaCobro sea un número válido
+                let diaCobroValido = diaCobro;
+                if (isNaN(diaCobro) || diaCobro < 1 || diaCobro > 31) {
+                    // Usar el día por defecto
+                    diaCobroValido = diaDefault;
+                }
+                
+                // Verificar si estamos en el día de cobro HOY
+                if (diaActual === diaCobroValido) {
+                    // Este cliente debe Y tiene día de cobro hoy
+                    clientesConDiaCobroHoy++;
+                    
+                    // Actualizar a DEUDA
+                    await actualizarEstadoDeuda(cliente.id);
+                    clientesActualizados++;
+                    
+                    const clienteInfo = {
+                        id: cliente.id,
+                        nombre: cliente.nombre,
+                        desde_mesanio_deuda: cliente.desde_mesanio_deuda,
+                        dia_cobro: diaCobroValido,
+                        mes_deuda: `${mesAnio.mesNombre}${mesAnio.anio}`
+                    };
+                    
+                    clientesActualizadosLista.push(clienteInfo);
+                    
+                    logger.addLog('COBRANZA', `Cliente actualizado a DEUDA: ${cliente.id} - ${cliente.nombre}`, {
+                        nombre: cliente.nombre,
+                        desde_mesanio_deuda: cliente.desde_mesanio_deuda,
+                        dia_cobro: diaCobroValido,
+                        dia_actual: diaActual,
+                        mes_deuda: `${mesAnio.mesNombre}${mesAnio.anio}`
+                    });
+                }
+            } catch (error) {
+                logger.addLog('COBRANZA', `Error procesando cliente para verificación de deuda: ${cliente.id}`, {
+                    nombre: cliente.nombre,
+                    error: error.message
+                });
+                continue;
+            }
+        }
+        
+        // Logs resumen detallados
+        logger.addLog('COBRANZA', `=== RESUMEN DE VERIFICACIÓN DE DEUDA ===`, {
+            totalClientesRevisados: clientes.length,
+            clientesQueDeben: clientesQueDeben,
+            clientesConDiaCobroHoy: clientesConDiaCobroHoy,
+            clientesActualizadosADeuda: clientesActualizados
+        });
+        
+        if (clientesActualizados > 0) {
+            logger.addLog('COBRANZA', `Clientes actualizados a DEUDA hoy (${clientesActualizados}):`, {
+                lista: clientesActualizadosLista.map(c => `${c.nombre} (ID: ${c.id}, Debe desde: ${c.mes_deuda}, Día cobro: ${c.dia_cobro})`)
+            });
+        } else {
+            logger.addLog('COBRANZA', `No hay clientes que cumplan las condiciones para actualizar a DEUDA hoy`, {
+                clientesQueDeben: clientesQueDeben,
+                diaActual: diaActual,
+                diaDefault: diaDefault
+            });
+        }
+        
+        logger.addLog('COBRANZA', `Verificación de deuda completada. Total actualizados: ${clientesActualizados}`);
+    } catch (error) {
+        logger.addLog('COBRANZA', 'Error en proceso de verificación de deuda', { error: error.message });
+    }
+}
+
 // Rutas de la API web
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -895,6 +1093,10 @@ app.get('/api/status', (req, res) => {
             cobranza: {
                 active: true,
                 schedule: process.env.COBRANZA_SCHEDULE
+            },
+            verificacionDeuda: {
+                active: true,
+                schedule: process.env.DEUDA_CHECK_SCHEDULE || '17 17 * * *'
             }
         },
         logs: {
@@ -935,7 +1137,9 @@ app.get('/api/config', (req, res) => {
         AUTORUTA_INTERVAL: process.env.AUTORUTA_INTERVAL,
         REPLICA_INTERVAL: process.env.REPLICA_INTERVAL,
         COBRANZA_SCHEDULE: process.env.COBRANZA_SCHEDULE,
-        MESSAGE_DELAY: process.env.MESSAGE_DELAY
+        MESSAGE_DELAY: process.env.MESSAGE_DELAY,
+        DEUDA_CHECK_SCHEDULE: process.env.DEUDA_CHECK_SCHEDULE || '17 17 * * *',
+        DEUDA_DIA_DEFAULT: process.env.DEUDA_DIA_DEFAULT || '13'
     };
     res.json(config);
 });
@@ -976,6 +1180,28 @@ app.post('/api/config', (req, res) => {
         API_CONFIG.TECNYTTESIMULACIONES.token = process.env.TECNYTTESIMULACIONES_TOKEN;
         API_CONFIG.TECNYTTESIMULACIONES.instance_id = process.env.TECNYTTESIMULACIONES_INSTANCE;
         
+        // Si se actualizó el horario de verificación de deuda, reiniciar el cron job
+        console.log('newConfig.DEUDA_CHECK_SCHEDULE', newConfig.DEUDA_CHECK_SCHEDULE);
+        if (newConfig.DEUDA_CHECK_SCHEDULE) {
+            try {
+                if (deudaCheckCron) {
+                    deudaCheckCron.stop();
+                }
+                console.log('newConfig.DEUDA_CHECK_SCHEDULE', newConfig.DEUDA_CHECK_SCHEDULE);
+                deudaCheckCron = cron.schedule(newConfig.DEUDA_CHECK_SCHEDULE, () => {
+                    console.log('Iniciando verificación automática de deuda');
+                    logger.addLog('COBRANZA', 'Iniciando verificación automática de deuda');
+                    processVerificacionDeuda();
+                }, {
+                    scheduled: true,
+                    timezone: "America/Lima" // Hora peruana
+                });
+                logger.addLog('SYSTEM', `Horario de verificación de deuda actualizado: ${newConfig.DEUDA_CHECK_SCHEDULE}`);
+            } catch (error) {
+                logger.addLog('SYSTEM', 'Error actualizando horario de verificación de deuda', { error: error.message });
+            }
+        }
+        
         logger.addLog('SYSTEM', 'Configuración actualizada desde web interface', {
             updatedKeys: Object.keys(newConfig)
         });
@@ -1005,6 +1231,22 @@ cron.schedule(process.env.COBRANZA_SCHEDULE, () => {
 
 // Programar verificación de clientes programados (cada minuto)
 setInterval(processClientesProgramados, 60000); // 60000 ms = 1 minuto
+
+// Programar verificación automática de deuda (diariamente)
+// Formato cron: minuto hora * * * (5:17 PM hora peruana = 17:17)
+const deudaCheckSchedule = process.env.DEUDA_CHECK_SCHEDULE || '17 17 * * *';
+console.log('deudaCheckSchedule configurado:', deudaCheckSchedule);
+deudaCheckCron = cron.schedule(deudaCheckSchedule, () => {
+    console.log('Iniciando verificación automática de deuda');
+    logger.addLog('COBRANZA', 'Iniciando verificación automática de deuda');
+    processVerificacionDeuda();
+}, {
+    scheduled: true,
+    timezone: "America/Lima" // Hora peruana
+});
+
+logger.addLog('SYSTEM', `Verificación automática de deuda programada: ${deudaCheckSchedule} (Hora peruana)`);
+console.log(`✅ Verificación automática de deuda programada para: ${deudaCheckSchedule} (Hora peruana)`);
 
 // Iniciar servidor
 app.listen(PORT, () => {
