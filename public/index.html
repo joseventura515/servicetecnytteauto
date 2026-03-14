@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tecnytte - Servicio Unificado</title>
+    <title>ST AUT - Servicio Tecnytte</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <style>
         * {
             margin: 0;
@@ -176,11 +177,90 @@
             font-size: 0.85em;
             color: #495057;
             background: #e9ecef;
-            padding: 5px;
+            padding: 8px;
             border-radius: 3px;
             white-space: pre-wrap;
-            max-height: 100px;
+            word-break: break-all;
+            max-height: 80px;
+            overflow-y: hidden;
+            position: relative;
+            transition: max-height 0.3s ease;
+            cursor: pointer;
+        }
+
+        .log-data.expanded {
+            max-height: 600px;
             overflow-y: auto;
+        }
+
+        .log-data-toggle {
+            display: inline-block;
+            font-size: 0.75em;
+            color: #007bff;
+            cursor: pointer;
+            margin-top: 4px;
+            user-select: none;
+        }
+
+        .log-data-toggle:hover {
+            text-decoration: underline;
+        }
+
+        .log-level {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-size: 0.7em;
+            font-weight: 700;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+
+        .log-level.INFO { background: #d4edda; color: #155724; }
+        .log-level.WARN { background: #fff3cd; color: #856404; }
+        .log-level.ERROR { background: #f8d7da; color: #721c24; }
+        .log-level.DEBUG { background: #cce5ff; color: #004085; }
+
+        .log-entry.level-ERROR {
+            border-left-color: #dc3545;
+            background: #fff5f5;
+        }
+
+        .log-entry.level-WARN {
+            border-left-color: #ffc107;
+            background: #fffdf0;
+        }
+
+        .log-entry.level-DEBUG {
+            border-left-color: #17a2b8;
+            background: #f0f8ff;
+        }
+
+        .log-entry.level-INFO {
+            border-left-color: #28a745;
+        }
+
+        .sse-status {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+
+        .sse-status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .sse-status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .data-key {
+            color: #0066cc;
+            font-weight: 600;
         }
 
         .loading {
@@ -332,6 +412,7 @@
             <p>Panel de control y monitoreo de logs</p>
             <div style="margin-top: 10px; font-size: 0.9em; opacity: 0.8;">
                 <span id="auth-status">🔒 Autenticado como: admin</span>
+                <span id="sse-indicator" class="sse-status disconnected">⚪ Conectando...</span>
             </div>
         </div>
 
@@ -739,10 +820,22 @@
             return date.toLocaleString('es-ES');
         }
 
+        // Función para formatear JSON con keys resaltadas
+        function formatJsonData(data) {
+            const json = JSON.stringify(data, null, 2);
+            // Resaltar claves importantes
+            return json.replace(/"(dataBody|urlEnviada|urlDestino|responseStatus|responseData|bodyCompleto|error|jid|imei|imei_real|origen|destino)"/g, 
+                '"<span class="data-key">$1</span>"');
+        }
+
         // Función para renderizar logs
         function renderLogs(category, logs) {
-            const container = document.getElementById(`${category.toLowerCase().replace('_', '-')}-logs`);
-            const countElement = document.getElementById(`${category.toLowerCase().replace('_', '-')}-count`);
+            const containerId = `${category.toLowerCase().replace(/_/g, '-')}-logs`;
+            const countId = `${category.toLowerCase().replace(/_/g, '-')}-count`;
+            const container = document.getElementById(containerId);
+            const countElement = document.getElementById(countId);
+            
+            if (!container || !countElement) return;
             
             countElement.textContent = logs.length;
             
@@ -751,16 +844,40 @@
                 return;
             }
 
-            container.innerHTML = logs.map(log => `
-                <div class="log-entry ${log.message.toLowerCase().includes('error') ? 'error' : ''}">
-                    <div class="log-timestamp">${formatDate(log.timestamp)}</div>
+            // Mostrar los más recientes primero
+            const reversedLogs = [...logs].reverse();
+
+            container.innerHTML = reversedLogs.map((log, idx) => {
+                const level = log.level || 'INFO';
+                const hasData = log.data && Object.keys(log.data).length > 0;
+                const dataId = `data-${category}-${idx}`;
+                
+                return `
+                <div class="log-entry level-${level}">
+                    <div class="log-timestamp">
+                        <span class="log-level ${level}">${level}</span>
+                        ${formatDate(log.timestamp)}
+                    </div>
                     <div class="log-message">${log.message}</div>
-                    ${log.data && Object.keys(log.data).length > 0 ? 
-                        `<div class="log-data">${JSON.stringify(log.data, null, 2)}</div>` : 
+                    ${hasData ? 
+                        `<div class="log-data" id="${dataId}" onclick="toggleLogData('${dataId}')">${formatJsonData(log.data)}</div>
+                         <span class="log-data-toggle" onclick="toggleLogData('${dataId}')">▶ Ver más</span>` : 
                         ''
                     }
                 </div>
-            `).join('');
+            `;
+            }).join('');
+        }
+
+        // Toggle expandir/colapsar log data
+        function toggleLogData(id) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.classList.toggle('expanded');
+            const toggle = el.nextElementSibling;
+            if (toggle) {
+                toggle.textContent = el.classList.contains('expanded') ? '▼ Ver menos' : '▶ Ver más';
+            }
         }
 
         // Función para cargar logs de una categoría
@@ -853,31 +970,130 @@
             }
         }
 
+        // SSE - Conexión en tiempo real
+        let sseSource = null;
+        let sseReconnectTimer = null;
+
+        function connectSSE() {
+            if (sseSource) {
+                sseSource.close();
+            }
+
+            const indicator = document.getElementById('sse-indicator');
+
+            sseSource = new EventSource('/api/logs/stream');
+            
+            sseSource.onopen = () => {
+                indicator.className = 'sse-status connected';
+                indicator.textContent = '🟢 Real-time';
+                if (sseReconnectTimer) {
+                    clearTimeout(sseReconnectTimer);
+                    sseReconnectTimer = null;
+                }
+            };
+
+            sseSource.onmessage = (event) => {
+                try {
+                    const logEntry = JSON.parse(event.data);
+                    if (logEntry.type === 'connected') return;
+                    
+                    // Agregar el log al panel correspondiente
+                    if (logEntry.category) {
+                        appendLogEntry(logEntry.category, logEntry);
+                    }
+                } catch(e) {
+                    console.warn('SSE parse error:', e);
+                }
+            };
+
+            sseSource.onerror = () => {
+                indicator.className = 'sse-status disconnected';
+                indicator.textContent = '🔴 Desconectado';
+                sseSource.close();
+                // Reconectar en 5 segundos
+                sseReconnectTimer = setTimeout(connectSSE, 5000);
+            };
+        }
+
+        // Agregar un log entry individual al panel (en tiempo real)
+        function appendLogEntry(category, log) {
+            const containerId = `${category.toLowerCase().replace(/_/g, '-')}-logs`;
+            const countId = `${category.toLowerCase().replace(/_/g, '-')}-count`;
+            const container = document.getElementById(containerId);
+            const countElement = document.getElementById(countId);
+            
+            if (!container || !countElement) return;
+
+            // Quitar mensaje "No hay logs" o "Cargando"
+            const loading = container.querySelector('.loading');
+            if (loading) loading.remove();
+
+            // Incrementar contador
+            const currentCount = parseInt(countElement.textContent) || 0;
+            countElement.textContent = currentCount + 1;
+
+            const level = log.level || 'INFO';
+            const hasData = log.data && Object.keys(log.data).length > 0;
+            const dataId = `data-live-${category}-${Date.now()}`;
+
+            const entryHtml = `
+                <div class="log-entry level-${level}" style="animation: fadeIn 0.3s ease;">
+                    <div class="log-timestamp">
+                        <span class="log-level ${level}">${level}</span>
+                        ${formatDate(log.timestamp)}
+                    </div>
+                    <div class="log-message">${log.message}</div>
+                    ${hasData ? 
+                        `<div class="log-data" id="${dataId}" onclick="toggleLogData('${dataId}')">${formatJsonData(log.data)}</div>
+                         <span class="log-data-toggle" onclick="toggleLogData('${dataId}')">▶ Ver más</span>` : 
+                        ''
+                    }
+                </div>
+            `;
+
+            // Insertar al inicio (más recientes primero)
+            container.insertAdjacentHTML('afterbegin', entryHtml);
+
+            // Limitar a 200 entradas visibles
+            while (container.children.length > 200) {
+                container.removeChild(container.lastChild);
+            }
+        }
+
         // Inicializar
         function init() {
-            // Verificar autenticación primero
             checkAuth();
-            
-            // Actualizar estado de autenticación
             updateAuthStatus();
-            
             refreshAll();
             
-            // Configurar actualización automática cada 10 segundos
+            // Conectar SSE para logs en tiempo real
+            connectSSE();
+            
+            // Fallback: refrescar status cada 10 segundos
             refreshInterval = setInterval(() => {
                 loadStatus();
             }, 10000);
+
+            // Fallback: refrescar todos los logs cada 30 segundos por si SSE falla
+            setInterval(() => {
+                if (!sseSource || sseSource.readyState !== EventSource.OPEN) {
+                    refreshAll();
+                }
+            }, 30000);
         }
 
-        // Inicializar cuando la página esté lista
         document.addEventListener('DOMContentLoaded', init);
 
-        // Limpiar intervalo cuando se cierre la página
         window.addEventListener('beforeunload', () => {
-            if (refreshInterval) {
-                clearInterval(refreshInterval);
-            }
+            if (refreshInterval) clearInterval(refreshInterval);
+            if (sseSource) sseSource.close();
         });
     </script>
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
 </body>
 </html> 

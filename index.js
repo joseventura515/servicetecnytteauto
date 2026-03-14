@@ -42,7 +42,7 @@ const API_CONFIG = {
     }
 };
 
-// Sistema de logs clasificados
+// Sistema de logs clasificados con niveles y SSE
 class Logger {
     constructor() {
         this.logs = {
@@ -52,30 +52,65 @@ class Logger {
             REPLICA: [],
             SYSTEM: []
         };
-        this.maxLogs = 1000; // Máximo 1000 logs por categoría
+        this.maxLogs = 1000;
+        this.sseClients = []; // Clientes SSE conectados
     }
 
-    addLog(category, message, data = {}) {
-        // Si la categoría no existe, la creamos
+    addLog(category, message, data = {}, level = 'INFO') {
         if (!this.logs[category]) {
             this.logs[category] = [];
+        }
+
+        // Auto-detectar nivel si no se especifica explícitamente
+        if (level === 'INFO') {
+            const msgLower = message.toLowerCase();
+            if (msgLower.includes('error') || msgLower.includes('falló') || msgLower.includes('failed')) {
+                level = 'ERROR';
+            } else if (msgLower.includes('warn') || msgLower.includes('cancelad') || msgLower.includes('inválid')) {
+                level = 'WARN';
+            }
         }
 
         const logEntry = {
             timestamp: new Date().toISOString(),
             message,
-            data
+            data,
+            level,
+            category
         };
 
         this.logs[category].push(logEntry);
         
-        // Mantener solo los últimos maxLogs
         if (this.logs[category].length > this.maxLogs) {
             this.logs[category] = this.logs[category].slice(-this.maxLogs);
         }
 
-        // También mostrar en consola
-        console.log(`[${category}] ${logEntry.timestamp} - ${message}`, data);
+        // Enviar a todos los clientes SSE conectados
+        this.broadcastSSE(logEntry);
+
+        // También mostrar en consola con color según nivel
+        const levelIcons = { INFO: 'ℹ️', WARN: '⚠️', ERROR: '❌', DEBUG: '🔍' };
+        console.log(`${levelIcons[level] || 'ℹ️'} [${category}] ${logEntry.timestamp} - ${message}`, Object.keys(data).length > 0 ? JSON.stringify(data).substring(0, 500) : '');
+    }
+
+    // SSE: registrar nuevo cliente
+    addSSEClient(res) {
+        this.sseClients.push(res);
+        res.on('close', () => {
+            this.sseClients = this.sseClients.filter(client => client !== res);
+        });
+    }
+
+    // SSE: broadcast a todos los clientes
+    broadcastSSE(logEntry) {
+        const data = JSON.stringify(logEntry);
+        this.sseClients.forEach(client => {
+            try {
+                client.write(`data: ${data}\n\n`);
+            } catch (e) {
+                // Cliente desconectado, se limpia en el evento close
+            }
+        });
     }
 
     getLogs(category = null) {
@@ -199,25 +234,32 @@ async function enviarDatosPosicion(fechaHoraInicial, fechaHoraFinal, cantidadPun
 
         try {
             const response = await axios.get(url);
-            logger.addLog(tipoSimulacion === 'REALTIME' ? 'AUTORUTA_REALTIME' : 'AUTORUTA_PASTTIME', 
-                `Punto enviado exitosamente`, {
+            const logCategory = tipoSimulacion === 'REALTIME' ? 'AUTORUTA_REALTIME' : 'AUTORUTA_PASTTIME';
+            logger.addLog(logCategory, 
+                `✅ Punto ${i + 1}/${puntosLatLong.length} enviado`, {
                     imei,
-                    punto: i + 1,
-                    total: puntosLatLong.length,
-                    latitud: puntosLatLong[i].latitud,
-                    longitud: puntosLatLong[i].longitud,
+                    punto: `${i + 1}/${puntosLatLong.length}`,
+                    lat: puntosLatLong[i].latitud,
+                    lng: puntosLatLong[i].longitud,
                     velocidad: speed,
                     fecha: fechaActual,
-                    trackerUrlDestino
+                    urlEnviada: url,
+                    responseStatus: response.status,
+                    responseData: typeof response.data === 'string' ? response.data.substring(0, 300) : response.data,
+                    destino: trackerUrlDestino
                 });
         } catch (error) {
-            logger.addLog(tipoSimulacion === 'REALTIME' ? 'AUTORUTA_REALTIME' : 'AUTORUTA_PASTTIME', 
-                `Error al enviar punto`, {
+            const logCategory = tipoSimulacion === 'REALTIME' ? 'AUTORUTA_REALTIME' : 'AUTORUTA_PASTTIME';
+            logger.addLog(logCategory, 
+                `❌ Error al enviar punto ${i + 1}/${puntosLatLong.length}`, {
                     imei,
-                    punto: i + 1,
+                    punto: `${i + 1}/${puntosLatLong.length}`,
+                    urlEnviada: url,
                     error: error.message,
-                    trackerUrlDestino
-                });
+                    responseStatus: error.response?.status,
+                    responseData: error.response?.data ? JSON.stringify(error.response.data).substring(0, 300) : null,
+                    destino: trackerUrlDestino
+                }, 'ERROR');
         }
         
         // Simulación de paradas
@@ -436,32 +478,39 @@ async function enviarMensaje(cliente, index) {
 
     try {
         const url = empresaConfig.baseUrl;
-        const params = {
+        const requestParams = {
             token: empresaConfig.token,
             instance_id: empresaConfig.instance_id,
             jid: `${cliente.numero.trim().replace(/\+/g, '')}@s.whatsapp.net`,
             msg: cliente.mensaje
         };
 
-        const response = await axios.get(url, { params });
+        const response = await axios.get(url, { params: requestParams });
         
-        logger.addLog('COBRANZA', 'Mensaje enviado exitosamente', {
+        logger.addLog('COBRANZA', `✅ Mensaje enviado a ${cliente.nombre}`, {
             index,
             cliente: cliente.nombre,
             numero: cliente.numero,
             empresa: cliente.empresa,
-            response: response.data
+            jid: requestParams.jid,
+            mensajeParcial: (cliente.mensaje || '').substring(0, 100) + '...',
+            instance_id: requestParams.instance_id,
+            responseStatus: response.status,
+            responseData: response.data
         });
 
         return response.data;
     } catch (error) {
-        logger.addLog('COBRANZA', 'Error al enviar mensaje', {
+        logger.addLog('COBRANZA', `❌ Error al enviar mensaje a ${cliente.nombre}`, {
             index,
             cliente: cliente.nombre,
             numero: cliente.numero,
             empresa: cliente.empresa,
-            error: error.message
-        });
+            jid: `${cliente.numero.trim().replace(/\+/g, '')}@s.whatsapp.net`,
+            error: error.message,
+            responseStatus: error.response?.status,
+            responseData: error.response?.data ? JSON.stringify(error.response.data).substring(0, 300) : null
+        }, 'ERROR');
         throw error;
     }
 }
@@ -707,24 +756,40 @@ async function processReplica() {
                             const params = formatParams(item.params);
                             const event = mapEvent(item.params.alarm);
                             const dataBody = createDataBody(simulacion.imei, item, params, event);
+                            const urlDestino = `${trackerUrlDestino}/api/api_loc_v2.php`;
+
+                            // Log detallado del dataBody antes de enviar
+                            logger.addLog('REPLICA', `📤 Enviando datos IMEI ${simulacion.imei}`, {
+                                imei: simulacion.imei,
+                                imei_real: imei,
+                                urlDestino,
+                                dataBody: dataBody,
+                                bodyCompleto: { imeis: [dataBody] }
+                            }, 'DEBUG');
 
                             try {
-                                const response = await axios.post(`${trackerUrlDestino}/api/api_loc_v2.php`, { imeis: [dataBody] });
-                                logger.addLog('REPLICA', 'Datos enviados correctamente al servidor destino', {
+                                const response = await axios.post(urlDestino, { imeis: [dataBody] });
+                                logger.addLog('REPLICA', `✅ Datos enviados OK → ${simulacion.imei}`, {
                                     imei: simulacion.imei,
                                     imei_real: imei,
-                                    trackerUrlOrigen,
-                                    trackerUrlDestino,
-                                    response: response.data
+                                    origen: trackerUrlOrigen,
+                                    destino: trackerUrlDestino,
+                                    dataBody: dataBody,
+                                    responseStatus: response.status,
+                                    responseData: response.data
                                 });
                             } catch (error) {
-                                logger.addLog('REPLICA', 'Error al enviar datos al servidor destino', {
+                                logger.addLog('REPLICA', `❌ Error enviando datos → ${simulacion.imei}`, {
                                     imei: simulacion.imei,
                                     imei_real: imei,
-                                    trackerUrlOrigen,
-                                    trackerUrlDestino,
-                                    error: error.message
-                                });
+                                    origen: trackerUrlOrigen,
+                                    destino: trackerUrlDestino,
+                                    dataBody: dataBody,
+                                    urlDestino,
+                                    error: error.message,
+                                    responseStatus: error.response?.status,
+                                    responseData: error.response?.data ? JSON.stringify(error.response.data).substring(0, 500) : null
+                                }, 'ERROR');
                             }
                         } else {
                             logger.addLog('REPLICA', 'No se encontraron datos para IMEI en servidor origen', {
@@ -1068,6 +1133,27 @@ async function processVerificacionDeuda() {
 // Rutas de la API web
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Endpoint SSE para logs en tiempo real
+app.get('/api/logs/stream', (req, res) => {
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*'
+    });
+    res.write('data: {"type":"connected"}\n\n');
+    logger.addSSEClient(res);
+    
+    // Keepalive cada 30s
+    const keepAlive = setInterval(() => {
+        try { res.write(': keepalive\n\n'); } catch(e) { clearInterval(keepAlive); }
+    }, 30000);
+    
+    req.on('close', () => {
+        clearInterval(keepAlive);
+    });
 });
 
 app.get('/api/logs', (req, res) => {
