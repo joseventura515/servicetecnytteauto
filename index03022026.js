@@ -882,30 +882,26 @@ function parsearMesAnio(mesanio) {
         'SEPTIEMBRE': 8, 'OCTUBRE': 9, 'NOVIEMBRE': 10, 'DICIEMBRE': 11
     };
     
-    // Limpiar el string: trim, uppercase y eliminar caracteres no alfanuméricos excepto guiones
-    const limpio = mesanio.trim().toUpperCase().replace(/[^A-Z0-9\-]/g, '');
-    
-    // Buscar el patrón: cualquiera de los meses conocidos seguido de 4 dígitos
-    for (const mesNombre in meses) {
-        const regex = new RegExp(`${mesNombre}(\\d{4})`);
-        const match = limpio.match(regex);
-        
-        if (match) {
-            const anio = parseInt(match[1]);
-            
-            // Validar que el año sea razonable (entre 2020 y 2050)
-            if (anio >= 2020 && anio <= 3000) {
-                return {
-                    mes: meses[mesNombre],
-                    anio: anio,
-                    mesNombre: mesNombre
-                };
-            }
-        }
+    // Limpiar el string y extraer solo la parte MESANIO (antes de guiones, espacios, etc.)
+    const limpio = mesanio.trim().toUpperCase();
+    // Buscar patrón: MES seguido de 4 dígitos (puede haber texto después)
+    const match = limpio.match(/^([A-Z]+)(\d{4})/);
+    if (!match) {
+        return null;
     }
     
-    // Si no encontró ningún mes válido, retornar null
-    return null;
+    const mesNombre = match[1];
+    const anio = parseInt(match[2]);
+    
+    if (!meses[mesNombre]) {
+        return null;
+    }
+    
+    return {
+        mes: meses[mesNombre],
+        anio: anio,
+        mesNombre: mesNombre
+    };
 }
 
 // Función para obtener clientes que necesitan verificación de deuda
@@ -964,12 +960,11 @@ async function processVerificacionDeuda() {
         
         // Contadores para logs
         let clientesQueDeben = 0; // Clientes que tienen deuda (mes anterior al actual)
+        let clientesConDiaCobroHoy = 0; // Clientes que deben Y tienen día de cobro hoy
         let clientesActualizados = 0; // Clientes que se actualizaron a DEUDA
-        let clientesEnEsperaDia = 0; // Clientes que deben pero aún no llega su día de cobro
         const clientesActualizadosLista = []; // Lista de clientes actualizados
-        const clientesEnEsperaLista = []; // Lista de clientes en espera
         
-        logger.addLog('COBRANZA', `Buscando clientes con deuda desde cualquier mes anterior a ${mesActualNumero}/${anioActual} para actualizar a DEUDA`);
+        logger.addLog('COBRANZA', `Buscando clientes con deuda desde cualquier mes anterior a ${mesActualNumero}/${anioActual} y día de cobro = ${diaActual}`);
         
         for (const cliente of clientes) {
             try {
@@ -978,19 +973,16 @@ async function processVerificacionDeuda() {
                 
                 if (!mesAnio) {
                     // Formato inválido, saltar
-                    logger.addLog('COBRANZA', `Formato inválido de desde_mesanio_deuda: ${cliente.desde_mesanio_deuda}`, {
-                        cliente: cliente.nombre,
-                        id: cliente.id
-                    });
                     continue;
                 }
                 
                 // Verificar que el mes de deuda sea ANTERIOR al mes actual
+                // Puede ser 1, 2, 3 meses o más atrás
                 // mesAnio.mes está en formato 0-11 (como getMonth())
                 const fechaDeuda = new Date(mesAnio.anio, mesAnio.mes, 1);
                 const fechaActualInicio = new Date(anioActual, mesActual, 1);
                 
-                // Si la fecha de deuda es anterior a la fecha actual (mes anterior o más)
+                // Si la fecha de deuda es anterior a la fecha actual (mes anterior)
                 const esMesAnterior = fechaDeuda < fechaActualInicio;
                 
                 if (!esMesAnterior) {
@@ -1000,9 +992,6 @@ async function processVerificacionDeuda() {
                 
                 // Este cliente DEBE (tiene deuda de un mes anterior)
                 clientesQueDeben++;
-                
-                // Calcular diferencia de meses
-                let mesesVencidos = (anioActual - mesAnio.anio) * 12 + (mesActual - mesAnio.mes);
                 
                 // Obtener día de cobro (del cliente o por defecto)
                 const diaCobro = cliente.dia_cobro ? parseInt(cliente.dia_cobro) : diaDefault;
@@ -1014,44 +1003,11 @@ async function processVerificacionDeuda() {
                     diaCobroValido = diaDefault;
                 }
                 
-                // LÓGICA:
-                // 1. Si pasó MÁS de 1 mes (mesesVencidos > 1) → Actualizar inmediatamente
-                // 2. Si pasó EXACTAMENTE 1 mes (mesesVencidos == 1) → Verificar día de cobro
-                
-                let debeActualizar = false;
-                let razon = '';
-                
-                if (mesesVencidos > 1) {
-                    // Ya pasó más de 1 mes, actualizar sin importar el día
-                    debeActualizar = true;
-                    razon = `Pasaron ${mesesVencidos} meses`;
-                } else if (mesesVencidos === 1) {
-                    // Pasó exactamente 1 mes, verificar día de cobro
-                    if (diaActual >= diaCobroValido) {
-                        debeActualizar = true;
-                        razon = `Pasó 1 mes y ya es día ${diaActual} (día cobro: ${diaCobroValido})`;
-                    } else {
-                        // Esperar al día de cobro
-                        clientesEnEsperaDia++;
-                        clientesEnEsperaLista.push({
-                            id: cliente.id,
-                            nombre: cliente.nombre,
-                            diaCobroEsperado: diaCobroValido,
-                            diaActual: diaActual
-                        });
-                        razon = `Pasó 1 mes pero aún no es día ${diaCobroValido} (hoy es ${diaActual})`;
-                        
-                        logger.addLog('COBRANZA', `Cliente en espera de día de cobro: ${cliente.id} - ${cliente.nombre}`, {
-                            nombre: cliente.nombre,
-                            desde_mesanio_deuda: cliente.desde_mesanio_deuda,
-                            dia_cobro: diaCobroValido,
-                            dia_actual: diaActual,
-                            razon
-                        });
-                    }
-                }
-                
-                if (debeActualizar) {
+                // Verificar si estamos en el día de cobro HOY
+                if (diaActual === diaCobroValido) {
+                    // Este cliente debe Y tiene día de cobro hoy
+                    clientesConDiaCobroHoy++;
+                    
                     // Actualizar a DEUDA
                     await actualizarEstadoDeuda(cliente.id);
                     clientesActualizados++;
@@ -1060,10 +1016,8 @@ async function processVerificacionDeuda() {
                         id: cliente.id,
                         nombre: cliente.nombre,
                         desde_mesanio_deuda: cliente.desde_mesanio_deuda,
-                        mes_deuda: `${mesAnio.mesNombre}${mesAnio.anio}`,
-                        mesesVencidos: mesesVencidos,
                         dia_cobro: diaCobroValido,
-                        razon: razon
+                        mes_deuda: `${mesAnio.mesNombre}${mesAnio.anio}`
                     };
                     
                     clientesActualizadosLista.push(clienteInfo);
@@ -1071,12 +1025,9 @@ async function processVerificacionDeuda() {
                     logger.addLog('COBRANZA', `Cliente actualizado a DEUDA: ${cliente.id} - ${cliente.nombre}`, {
                         nombre: cliente.nombre,
                         desde_mesanio_deuda: cliente.desde_mesanio_deuda,
-                        mes_deuda: `${mesAnio.mesNombre}${mesAnio.anio}`,
-                        mesesVencidos: mesesVencidos,
                         dia_cobro: diaCobroValido,
                         dia_actual: diaActual,
-                        razon: razon,
-                        fechaActual: `${diaActual}/${mesActualNumero}/${anioActual}`
+                        mes_deuda: `${mesAnio.mesNombre}${mesAnio.anio}`
                     });
                 }
             } catch (error) {
@@ -1091,25 +1042,20 @@ async function processVerificacionDeuda() {
         // Logs resumen detallados
         logger.addLog('COBRANZA', `=== RESUMEN DE VERIFICACIÓN DE DEUDA ===`, {
             totalClientesRevisados: clientes.length,
-            clientesConDeudaAnterior: clientesQueDeben,
-            clientesEnEsperaDeDiaCobro: clientesEnEsperaDia,
+            clientesQueDeben: clientesQueDeben,
+            clientesConDiaCobroHoy: clientesConDiaCobroHoy,
             clientesActualizadosADeuda: clientesActualizados
         });
         
         if (clientesActualizados > 0) {
             logger.addLog('COBRANZA', `Clientes actualizados a DEUDA hoy (${clientesActualizados}):`, {
-                lista: clientesActualizadosLista.map(c => `${c.nombre} (ID: ${c.id}, Debe desde: ${c.mes_deuda}, Meses vencidos: ${c.mesesVencidos}, Razón: ${c.razon})`)
+                lista: clientesActualizadosLista.map(c => `${c.nombre} (ID: ${c.id}, Debe desde: ${c.mes_deuda}, Día cobro: ${c.dia_cobro})`)
             });
         } else {
-            logger.addLog('COBRANZA', `No hay clientes para actualizar a DEUDA hoy`, {
-                totalRevisados: clientes.length,
-                clientesEnEspera: clientesEnEsperaDia
-            });
-        }
-        
-        if (clientesEnEsperaDia > 0) {
-            logger.addLog('COBRANZA', `Clientes en espera de día de cobro (${clientesEnEsperaDia}):`, {
-                lista: clientesEnEsperaLista.map(c => `${c.nombre} (ID: ${c.id}, Día cobro: ${c.diaCobroEsperado}, Hoy: ${c.diaActual})`)
+            logger.addLog('COBRANZA', `No hay clientes que cumplan las condiciones para actualizar a DEUDA hoy`, {
+                clientesQueDeben: clientesQueDeben,
+                diaActual: diaActual,
+                diaDefault: diaDefault
             });
         }
         

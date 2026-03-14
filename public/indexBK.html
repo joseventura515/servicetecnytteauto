@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tecnytte - Servicio Unificado</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .status-bar {
+            background: #f8f9fa;
+            padding: 20px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .status-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            border-left: 4px solid #28a745;
+        }
+
+        .status-card.error {
+            border-left-color: #dc3545;
+        }
+
+        .status-card h3 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+
+        .status-card p {
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+
+        .controls {
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .controls button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+            transition: background 0.3s;
+        }
+
+        .controls button:hover {
+            background: #0056b3;
+        }
+
+        .controls button.danger {
+            background: #dc3545;
+        }
+
+        .controls button.danger:hover {
+            background: #c82333;
+        }
+
+        .logs-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .log-section {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .log-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .log-header h3 {
+            margin: 0;
+            font-size: 1.2em;
+        }
+
+        .log-count {
+            background: rgba(255,255,255,0.2);
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.9em;
+        }
+
+        .log-content {
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        .log-entry {
+            background: #f8f9fa;
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 3px solid #007bff;
+        }
+
+        .log-entry.error {
+            border-left-color: #dc3545;
+            background: #fff5f5;
+        }
+
+        .log-timestamp {
+            font-size: 0.8em;
+            color: #6c757d;
+            margin-bottom: 5px;
+        }
+
+        .log-message {
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        .log-data {
+            font-size: 0.85em;
+            color: #495057;
+            background: #e9ecef;
+            padding: 5px;
+            border-radius: 3px;
+            white-space: pre-wrap;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+        }
+
+        .refresh-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }
+
+        .refresh-btn:hover {
+            background: #218838;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            color: #2c3e50;
+        }
+
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        .config-section {
+            margin-bottom: 20px;
+        }
+
+        .config-section h3 {
+            color: #495057;
+            margin-bottom: 10px;
+            padding: 5px 0;
+            border-bottom: 2px solid #007bff;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .config-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .config-item label {
+            font-weight: 500;
+            margin-bottom: 5px;
+            color: #495057;
+        }
+
+        .config-item input, .config-item textarea {
+            padding: 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .config-item textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        .config-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+        }
+
+        @media (max-width: 768px) {
+            .logs-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .status-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .config-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Tecnytte - Servicio Unificado</h1>
+            <p>Panel de control y monitoreo de logs</p>
+            <div style="margin-top: 10px; font-size: 0.9em; opacity: 0.8;">
+                <span id="auth-status">🔒 Autenticado como: admin</span>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-grid" id="statusGrid">
+                <div class="status-card">
+                    <h3>🔄 Autoruta PastTime</h3>
+                    <p>Estado: <span id="autoruta-status">Cargando...</span></p>
+                    <p>Última ejecución: <span id="autoruta-last">-</span></p>
+                </div>
+                <div class="status-card">
+                    <h3>⚡ Autoruta RealTime</h3>
+                    <p>Estado: <span id="realtime-status">Cargando...</span></p>
+                    <p>Última ejecución: <span id="realtime-last">-</span></p>
+                </div>
+                <div class="status-card">
+                    <h3>🔄 Réplica</h3>
+                    <p>Estado: <span id="replica-status">Cargando...</span></p>
+                    <p>Última ejecución: <span id="replica-last">-</span></p>
+                </div>
+                <div class="status-card">
+                    <h3>💬 Cobranza</h3>
+                    <p>Estado: <span id="cobranza-status">Cargando...</span></p>
+                    <p>Última ejecución: <span id="cobranza-last">-</span></p>
+                </div>
+                <div class="status-card">
+                    <h3>📅 Programados</h3>
+                    <p>Estado: <span id="programados-status">Activo</span></p>
+                    <p>Verificación: <span id="programados-last">Cada minuto</span></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button onclick="refreshAll()">🔄 Actualizar Todo</button>
+            <button onclick="clearAllLogs()" class="danger">🗑️ Limpiar Todos los Logs</button>
+            <button onclick="clearLogs('COBRANZA')" class="danger">🗑️ Limpiar Cobranza</button>
+            <button onclick="clearLogs('AUTORUTA_PASTTIME')" class="danger">🗑️ Limpiar Autoruta PastTime</button>
+            <button onclick="clearLogs('AUTORUTA_REALTIME')" class="danger">🗑️ Limpiar Autoruta RealTime</button>
+            <button onclick="clearLogs('REPLICA')" class="danger">🗑️ Limpiar Réplica</button>
+            <button onclick="clearLogs('SYSTEM')" class="danger">🗑️ Limpiar Sistema</button>
+            <button onclick="showConfigModal()" style="background: #17a2b8;">⚙️ Configuración</button>
+            <button onclick="logout()" style="background: #6c757d;">🚪 Cerrar Sesión</button>
+        </div>
+
+        <div class="logs-container">
+            <div class="log-section">
+                <div class="log-header">
+                    <h3>💬 Cobranza</h3>
+                    <div class="log-count" id="cobranza-count">0</div>
+                    <button class="refresh-btn" onclick="refreshLogs('COBRANZA')">🔄</button>
+                </div>
+                <div class="log-content" id="cobranza-logs">
+                    <div class="loading">Cargando logs...</div>
+                </div>
+            </div>
+
+            <div class="log-section">
+                <div class="log-header">
+                    <h3>🔄 Autoruta PastTime</h3>
+                    <div class="log-count" id="autoruta-pasttime-count">0</div>
+                    <button class="refresh-btn" onclick="refreshLogs('AUTORUTA_PASTTIME')">🔄</button>
+                </div>
+                <div class="log-content" id="autoruta-pasttime-logs">
+                    <div class="loading">Cargando logs...</div>
+                </div>
+            </div>
+
+            <div class="log-section">
+                <div class="log-header">
+                    <h3>⚡ Autoruta RealTime</h3>
+                    <div class="log-count" id="autoruta-realtime-count">0</div>
+                    <button class="refresh-btn" onclick="refreshLogs('AUTORUTA_REALTIME')">🔄</button>
+                </div>
+                <div class="log-content" id="autoruta-realtime-logs">
+                    <div class="loading">Cargando logs...</div>
+                </div>
+            </div>
+
+            <div class="log-section">
+                <div class="log-header">
+                    <h3>🔄 Réplica</h3>
+                    <div class="log-count" id="replica-count">0</div>
+                    <button class="refresh-btn" onclick="refreshLogs('REPLICA')">🔄</button>
+                </div>
+                <div class="log-content" id="replica-logs">
+                    <div class="loading">Cargando logs...</div>
+                </div>
+            </div>
+
+            <div class="log-section">
+                <div class="log-header">
+                    <h3>⚙️ Sistema</h3>
+                    <div class="log-count" id="system-count">0</div>
+                    <button class="refresh-btn" onclick="refreshLogs('SYSTEM')">🔄</button>
+                </div>
+                <div class="log-content" id="system-logs">
+                    <div class="loading">Cargando logs...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Configuración -->
+    <div id="configModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚙️ Configuración del Sistema</h2>
+                <span class="close" onclick="closeConfigModal()">&times;</span>
+            </div>
+            
+            <form id="configForm">
+                <!-- Base de Datos -->
+                <div class="config-section">
+                    <h3>🗄️ Base de Datos</h3>
+                    <div class="config-grid">
+                        <div class="config-item">
+                            <label for="DB_HOST">Host:</label>
+                            <input type="text" id="DB_HOST" name="DB_HOST" required>
+                        </div>
+                        <div class="config-item">
+                            <label for="DB_USER">Usuario:</label>
+                            <input type="text" id="DB_USER" name="DB_USER" required>
+                        </div>
+                        <div class="config-item">
+                            <label for="DB_PASSWORD">Contraseña:</label>
+                            <input type="password" id="DB_PASSWORD" name="DB_PASSWORD" required>
+                        </div>
+                        <div class="config-item">
+                            <label for="DB_NAME">Base de Datos:</label>
+                            <input type="text" id="DB_NAME" name="DB_NAME" required>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Servidor -->
+                <div class="config-section">
+                    <h3>🌐 Servidor</h3>
+                    <div class="config-grid">
+                        <div class="config-item">
+                            <label for="PORT">Puerto:</label>
+                            <input type="number" id="PORT" name="PORT" required>
+                        </div>
+                        <div class="config-item">
+                            <label for="NODE_ENV">Entorno:</label>
+                            <input type="text" id="NODE_ENV" name="NODE_ENV" required>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- APIs -->
+                <div class="config-section">
+                    <h3>🔗 APIs</h3>
+                    <div class="config-grid">
+                        <div class="config-item">
+                            <label for="TECNYTTE_TRACKER_URL">URL Tracker:</label>
+                            <input type="url" id="TECNYTTE_TRACKER_URL" name="TECNYTTE_TRACKER_URL" required>
+                        </div>
+                        <div class="config-item">
+                            <label for="API_KEY">API Key:</label>
+                            <input type="text" id="API_KEY" name="API_KEY" required>
+                        </div>
+                        <div class="config-item">
+                            <label for="USER_TOKEN">User Token:</label>
+                            <input type="text" id="USER_TOKEN" name="USER_TOKEN" required>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- WhatsApp APIs -->
+                <div class="config-section">
+                    <h3>💬 WhatsApp APIs</h3>
+                    <div class="config-grid">
+                        <div class="config-item">
+                            <label for="TECNYTTESOLUCIONES_TOKEN">Token Tecnytte Soluciones:</label>
+                            <textarea id="TECNYTTESOLUCIONES_TOKEN" name="TECNYTTESOLUCIONES_TOKEN" required></textarea>
+                        </div>
+                        <div class="config-item">
+                            <label for="TECNYTTESOLUCIONES_INSTANCE">Instance Tecnytte Soluciones:</label>
+                            <textarea id="TECNYTTESOLUCIONES_INSTANCE" name="TECNYTTESOLUCIONES_INSTANCE" required></textarea>
+                        </div>
+                        <div class="config-item">
+                            <label for="TECNYTTEGPS_TOKEN">Token Tecnytte GPS:</label>
+                            <textarea id="TECNYTTEGPS_TOKEN" name="TECNYTTEGPS_TOKEN" required></textarea>
+                        </div>
+                        <div class="config-item">
+                            <label for="TECNYTTEGPS_INSTANCE">Instance Tecnytte GPS:</label>
+                            <textarea id="TECNYTTEGPS_INSTANCE" name="TECNYTTEGPS_INSTANCE" required></textarea>
+                        </div>
+                        <div class="config-item">
+                            <label for="TECNYTTESIMULACIONES_TOKEN">Token Tecnytte Simulaciones:</label>
+                            <textarea id="TECNYTTESIMULACIONES_TOKEN" name="TECNYTTESIMULACIONES_TOKEN" required></textarea>
+                        </div>
+                        <div class="config-item">
+                            <label for="TECNYTTESIMULACIONES_INSTANCE">Instance Tecnytte Simulaciones:</label>
+                            <textarea id="TECNYTTESIMULACIONES_INSTANCE" name="TECNYTTESIMULACIONES_INSTANCE" required></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Intervalos -->
+                <div class="config-section">
+                    <h3>⏰ Intervalos</h3>
+                    <div class="config-grid">
+                        <div class="config-item">
+                            <label for="AUTORUTA_INTERVAL">Intervalo Autoruta (ms):</label>
+                            <input type="number" id="AUTORUTA_INTERVAL" name="AUTORUTA_INTERVAL" required>
+                        </div>
+                        <div class="config-item">
+                            <label for="REPLICA_INTERVAL">Intervalo Réplica (ms):</label>
+                            <input type="number" id="REPLICA_INTERVAL" name="REPLICA_INTERVAL" required>
+                        </div>
+                        <div class="config-item">
+                            <label for="COBRANZA_SCHEDULE">Horario Cobranza (cron):</label>
+                            <input type="text" id="COBRANZA_SCHEDULE" name="COBRANZA_SCHEDULE" required>
+                        </div>
+                        <div class="config-item">
+                            <label for="MESSAGE_DELAY">Delay Mensajes (ms):</label>
+                            <input type="number" id="MESSAGE_DELAY" name="MESSAGE_DELAY" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="config-actions">
+                    <button type="button" onclick="closeConfigModal()" style="background: #6c757d;">❌ Cancelar</button>
+                    <button type="submit" style="background: #28a745;">💾 Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        let refreshInterval;
+        
+        // Configuración de autenticación
+        const AUTH_CONFIG = {
+            username: 'admin',
+            password: 'tecnytte123',
+            sessionKey: 'tecnytte_auth'
+        };
+        
+        // Verificar autenticación al cargar
+        function checkAuth() {
+            const isAuthenticated = sessionStorage.getItem(AUTH_CONFIG.sessionKey);
+            if (!isAuthenticated) {
+                showLoginModal();
+            }
+        }
+        
+        // Mostrar modal de login
+        function showLoginModal() {
+            const username = prompt('Usuario:');
+            if (username === null) {
+                showLoginModal(); // Si cancela, mostrar de nuevo
+                return;
+            }
+            
+            const password = prompt('Contraseña:');
+            if (password === null) {
+                showLoginModal(); // Si cancela, mostrar de nuevo
+                return;
+            }
+            
+            if (username === AUTH_CONFIG.username && password === AUTH_CONFIG.password) {
+                sessionStorage.setItem(AUTH_CONFIG.sessionKey, 'true');
+                showWelcomeMessage();
+            } else {
+                alert('Usuario o contraseña incorrectos');
+                showLoginModal(); // Mostrar de nuevo si falla
+            }
+        }
+        
+        // Mostrar mensaje de bienvenida
+        function showWelcomeMessage() {
+            alert('¡Bienvenido al Panel de Administración de Tecnytte!');
+            updateAuthStatus();
+        }
+        
+        // Actualizar estado de autenticación en la interfaz
+        function updateAuthStatus() {
+            const authStatus = document.getElementById('auth-status');
+            const isAuthenticated = sessionStorage.getItem(AUTH_CONFIG.sessionKey);
+            
+            if (isAuthenticated) {
+                authStatus.innerHTML = '🔒 Autenticado como: admin';
+                authStatus.style.color = '#28a745';
+            } else {
+                authStatus.innerHTML = '🔓 No autenticado';
+                authStatus.style.color = '#dc3545';
+            }
+        }
+        
+        // Función para cerrar sesión
+        function logout() {
+            sessionStorage.removeItem(AUTH_CONFIG.sessionKey);
+            alert('Sesión cerrada');
+            showLoginModal();
+        }
+
+        // Funciones para el modal de configuración
+        function showConfigModal() {
+            document.getElementById('configModal').style.display = 'block';
+            loadCurrentConfig();
+        }
+
+        function closeConfigModal() {
+            document.getElementById('configModal').style.display = 'none';
+        }
+
+        // Cargar configuración actual
+        async function loadCurrentConfig() {
+            try {
+                const response = await fetch(`${API_BASE}/config`);
+                const config = await response.json();
+                
+                // Llenar formulario con valores actuales
+                Object.keys(config).forEach(key => {
+                    const element = document.getElementById(key);
+                    if (element) {
+                        element.value = config[key] || '';
+                    }
+                });
+            } catch (error) {
+                console.error('Error cargando configuración:', error);
+                alert('Error al cargar la configuración actual');
+            }
+        }
+
+        // Manejar envío del formulario de configuración
+        document.getElementById('configForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            if (!confirm('¿Estás seguro de que quieres actualizar la configuración? Esto puede afectar el funcionamiento del sistema.')) {
+                return;
+            }
+            
+            const formData = new FormData(this);
+            const configData = {};
+            
+            for (let [key, value] of formData.entries()) {
+                configData[key] = value;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/config`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(configData)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert(`Configuración actualizada exitosamente.\nVariables actualizadas: ${result.updatedKeys.join(', ')}`);
+                    closeConfigModal();
+                } else {
+                    alert(`Error al actualizar configuración: ${result.error}`);
+                }
+            } catch (error) {
+                console.error('Error actualizando configuración:', error);
+                alert('Error al actualizar la configuración');
+            }
+        });
+
+        // Cerrar modal al hacer clic fuera de él
+        window.onclick = function(event) {
+            const modal = document.getElementById('configModal');
+            if (event.target === modal) {
+                closeConfigModal();
+            }
+        }
+
+        // Función para formatear fecha
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString('es-ES');
+        }
+
+        // Función para renderizar logs
+        function renderLogs(category, logs) {
+            const container = document.getElementById(`${category.toLowerCase().replace('_', '-')}-logs`);
+            const countElement = document.getElementById(`${category.toLowerCase().replace('_', '-')}-count`);
+            
+            countElement.textContent = logs.length;
+            
+            if (logs.length === 0) {
+                container.innerHTML = '<div class="loading">No hay logs disponibles</div>';
+                return;
+            }
+
+            container.innerHTML = logs.map(log => `
+                <div class="log-entry ${log.message.toLowerCase().includes('error') ? 'error' : ''}">
+                    <div class="log-timestamp">${formatDate(log.timestamp)}</div>
+                    <div class="log-message">${log.message}</div>
+                    ${log.data && Object.keys(log.data).length > 0 ? 
+                        `<div class="log-data">${JSON.stringify(log.data, null, 2)}</div>` : 
+                        ''
+                    }
+                </div>
+            `).join('');
+        }
+
+        // Función para cargar logs de una categoría
+        async function loadLogs(category) {
+            try {
+                const response = await fetch(`${API_BASE}/logs?category=${category}`);
+                const logs = await response.json();
+                renderLogs(category, logs);
+            } catch (error) {
+                console.error(`Error cargando logs de ${category}:`, error);
+                document.getElementById(`${category.toLowerCase().replace('_', '-')}-logs`).innerHTML = 
+                    '<div class="loading">Error al cargar logs</div>';
+            }
+        }
+
+        // Función para cargar estado del sistema
+        async function loadStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/status`);
+                const status = await response.json();
+                
+                // Actualizar contadores
+                document.getElementById('cobranza-count').textContent = status.logs.COBRANZA;
+                document.getElementById('autoruta-pasttime-count').textContent = status.logs.AUTORUTA_PASTTIME;
+                document.getElementById('autoruta-realtime-count').textContent = status.logs.AUTORUTA_REALTIME;
+                document.getElementById('replica-count').textContent = status.logs.REPLICA;
+                document.getElementById('system-count').textContent = status.logs.SYSTEM;
+                
+                // Actualizar estados
+                document.getElementById('autoruta-status').textContent = 'Activo';
+                document.getElementById('realtime-status').textContent = 'Activo';
+                document.getElementById('replica-status').textContent = 'Activo';
+                document.getElementById('cobranza-status').textContent = 'Programado';
+                
+                // Actualizar últimas ejecuciones
+                document.getElementById('autoruta-last').textContent = formatDate(status.services.autoruta.lastRun);
+                document.getElementById('realtime-last').textContent = formatDate(status.services.autoruta.lastRun);
+                document.getElementById('replica-last').textContent = formatDate(status.services.replica.lastRun);
+                document.getElementById('cobranza-last').textContent = formatDate(status.timestamp);
+                
+            } catch (error) {
+                console.error('Error cargando estado:', error);
+            }
+        }
+
+        // Función para refrescar logs de una categoría específica
+        function refreshLogs(category) {
+            loadLogs(category);
+        }
+
+        // Función para refrescar todo
+        function refreshAll() {
+            loadStatus();
+            loadLogs('COBRANZA');
+            loadLogs('AUTORUTA_PASTTIME');
+            loadLogs('AUTORUTA_REALTIME');
+            loadLogs('REPLICA');
+            loadLogs('SYSTEM');
+        }
+
+        // Función para limpiar logs
+        async function clearLogs(category = null) {
+            try {
+                const url = category ? `${API_BASE}/logs?category=${category}` : `${API_BASE}/logs`;
+                const response = await fetch(url, { method: 'DELETE' });
+                
+                if (response.ok) {
+                    if (category) {
+                        loadLogs(category);
+                    } else {
+                        refreshAll();
+                    }
+                    alert('Logs limpiados exitosamente');
+                } else {
+                    alert('Error al limpiar logs');
+                }
+            } catch (error) {
+                console.error('Error limpiando logs:', error);
+                alert('Error al limpiar logs');
+            }
+        }
+
+        // Función para limpiar todos los logs
+        function clearAllLogs() {
+            if (confirm('¿Estás seguro de que quieres limpiar todos los logs?')) {
+                clearLogs();
+            }
+        }
+
+        // Inicializar
+        function init() {
+            // Verificar autenticación primero
+            checkAuth();
+            
+            // Actualizar estado de autenticación
+            updateAuthStatus();
+            
+            refreshAll();
+            
+            // Configurar actualización automática cada 10 segundos
+            refreshInterval = setInterval(() => {
+                loadStatus();
+            }, 10000);
+        }
+
+        // Inicializar cuando la página esté lista
+        document.addEventListener('DOMContentLoaded', init);
+
+        // Limpiar intervalo cuando se cierre la página
+        window.addEventListener('beforeunload', () => {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+        });
+    </script>
+</body>
+</html> 
